@@ -11,6 +11,8 @@ import requests as req
 from bs4 import BeautifulSoup as bs
 from lxml import html
 import pandas as pd
+import numpy as np
+import threading
 
 
 try:
@@ -142,18 +144,17 @@ def scrape_historical(t):
     """
     :param t: string, the ticker (e.g. SPY)
     """
-    pass
+    url = 'http://www.nasdaq.com/symbol/{}/historical'.format(t.lower())
+    res = req.get(url)
 
 
-def scrape_shorts(t):
-    # get https://finance.yahoo.com/quote/NAVI/key-statistics?p=NAVI
-    url = 'https://finance.yahoo.com/quote/{0}/key-statistics?p={0}'.format(t)
-    page = req.get(url)
-    tree = html.fromstring(page.content)
-    share_stats = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[2]/div/div[2]/table')
-    soup = bs(html.tostring(share_stats[0]), 'lxml')
+def add_rows_old(el, d):
+    """
+    :param el: lxml element (a table)
+    :param d: dictionary
+    """
+    soup = bs(html.tostring(el[0]), 'lxml')
     rows = soup.find_all('tr')
-    ss_dict = {}
     for r in rows:
         cols = r.find_all('td')
         lab = cols[0].find('span').text.strip()
@@ -166,7 +167,135 @@ def scrape_shorts(t):
             val = float(val[:-1]) * 1000000000
         elif val[-1] == 'T':
             val = float(val[:-1]) * 1000000000000
+        elif val == 'N/A':
+            val = val
         else:
             val = float(val)
 
-        ss_dict[lab] = val
+        d[lab] = val
+
+    return d
+
+
+def add_rows(t, d):
+    """
+    :param t: a string, html table
+    :param d: dictionary
+
+    broke on BBP
+    """
+    rows = t.find_all('tr')
+    for r in rows:
+        cols = r.find_all('td')
+        lab = cols[0].find('span').text.strip()
+
+        val = cols[1].text.strip().strip('%')
+        val = val.replace(',', '')
+        if val[-1] == 'k':
+            val = float(val[:-1]) * 1000
+        elif val[-1] == 'M':
+            val = float(val[:-1]) * 1000000
+        elif val[-1] == 'B':
+            val = float(val[:-1]) * 1000000000
+        elif val[-1] == 'T':
+            val = float(val[:-1]) * 1000000000000
+        elif val == 'N/A':
+            val = val
+        else:
+            try:
+                val = float(val)
+            except ValueError:
+                pass  # if value is a date
+
+        d[lab] = val
+
+    return d
+
+
+def scrape_stats(t):
+    # broke on bbp
+    # get https://finance.yahoo.com/quote/NAVI/key-statistics?p=NAVI
+    url = 'https://finance.yahoo.com/quote/{0}/key-statistics?p={0}'.format(t)
+    page = req.get(url)
+    soup = bs(page.content, 'lxml')
+    tables = soup.find_all('table')
+    no_tables, no_stats = [], []
+    if len(tables) == 0:
+        print('WARNING: no tables found')
+    elif len(tables) < 10:
+        print('WARNING: no stats page for', t)
+
+    ss_dict = {'ticker':t}
+    for t in tables:
+        ss_dict = add_rows(t, ss_dict)
+
+
+    return pd.DataFrame(ss_dict, index=[0])
+
+
+    # old way of doing it, left for educational purposes
+    # should change add_rows to add_rows_old
+    # tree = html.fromstring(page.content)
+    # share_stats = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[2]/div/div[2]/table')
+    # ss_dict = add_rows(share_stats, s_dict)
+    #
+    # # valuation measures section
+    # val_meas = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[1]/div[1]')
+    # ss_dict = add_rows(val_meas, ss_dict)
+    #
+    # # profitability section
+    # prof = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[1]/div[2]/div[2]/table')
+    # ss_dict = add_rows(prof, ss_dict)
+    #
+    # # management effectiveness section
+    # man = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[1]/div[2]/div[3]/table')
+    # ss_dict = add_rows(man, ss_dict)
+    #
+    # # income statement
+    # inc = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[1]/div[2]/div[4]/table')
+    # ss_dict = add_rows(inc, ss_dict)
+    #
+    # # balance sheet
+    # bal = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[1]/div[2]/div[5]/table')
+    # ss_dict = add_rows(bal, ss_dict)
+    #
+    # # cash flow statement
+    # cfs = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[1]/div[2]/div[6]/table')
+    # ss_dict = add_rows(cfs, ss_dict)
+    #
+    # # stock price history
+    # sph = tree.xpath('//*[@id="Col1-3-KeyStatistics-Proxy"]/section/div[2]/div[2]/div/div[3]/table')
+    # ss_dict = add_rows(sph, ss_dict)
+
+    # one more table to add...meh
+
+
+def scrape_all_tickers(tickers):
+    full_df = None
+    for t in tickers:
+        print(t)
+        df = scrape_stats(t)
+        if full_df is None:
+            full_df = df
+        else:
+            full_df = full_df.append(df)
+
+    return full_df
+
+
+def scrape_tickers_threads(tickers):
+    """
+    need to write to a mongodb before implementing this, for concurrent writes
+    """
+    tik = np.array(tickers)
+    chunk_size = tik.shape[0] // 20
+    tiks = list(np.split(tik, 20))
+    if chunk_size != tik.shape[0] / 20:
+        tiks.append(tik[chunk_size * 20:])
+
+    for ti in tiks
+        t = threading.Thread(target=scrape_all_tickers_mongo, args=(ti,))
+        t.start()
+        threads.append(t)
+        for th in threads:
+            th.join()
