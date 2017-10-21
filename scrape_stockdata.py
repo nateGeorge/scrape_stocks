@@ -85,7 +85,7 @@ def get_latest_files():
     return latest_files
 
 
-def get_stock_list(no_scrape=False):
+def get_stock_list(scrape=True):
     """
 
     """
@@ -119,7 +119,7 @@ def get_stock_list(no_scrape=False):
     #
     # res = sess.get(url)
 
-    if not no_scrape:
+    if scrape:
         # TODO: add error handling for no connection
         files = get_latest_files()  # get 3 latest files in d/l folder to check when d/ls are complete
         driver = setup_driver()
@@ -151,7 +151,7 @@ def get_stock_list(no_scrape=False):
     tickers = sorted(all_ex.Symbol.values)
     tickers = [t.strip() for t in tickers]
 
-    if not no_scrape:
+    if scrape:
         driver.quit()
 
     return tickers
@@ -273,7 +273,9 @@ def scrape_stats(t):
         'Accept': '*/*',
         'Connection': 'close'
     }
-    page = req.get(url, headers=headers)
+    print('requsting...')
+    page = req.get(url, headers=headers, timeout=20)
+    print('finished request')
     while not page.ok:
         print('scrape error! trying again...')
         time.sleep(2)
@@ -404,6 +406,7 @@ def scrape_all_tickers(tickers):
         while df is None:
             # sometimes some errors while scraping
             try:
+                print('trying to scrape...')
                 df = scrape_stats(t)
             except Exception as e:
                 print('error:', e)
