@@ -11,6 +11,13 @@ All done on Ubuntu 16.04 64-bit.
 https://www.digitalocean.com/community/tutorials/how-to-install-mongodb-on-ubuntu-16-04
 
 ## scrape
+To do a basic scrape, do:
+```python
+run scrape_stockdata.py
+tickers = get_stock_list(scrape=False)
+df = scrape_all_tickers(tickers)
+```
+
 ```python
 run scrape_stockdata.py
 tickers = get_stock_list(no_scrape=True)
