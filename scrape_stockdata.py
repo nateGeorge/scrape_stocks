@@ -273,9 +273,7 @@ def scrape_stats(t):
         'Accept': '*/*',
         'Connection': 'close'
     }
-    print('requsting...')
     page = req.get(url, headers=headers, timeout=20)
-    print('finished request')
     while not page.ok:
         print('scrape error! trying again...')
         time.sleep(2)
