@@ -15,6 +15,7 @@ To do a basic scrape, do:
 ```python
 run scrape_stockdata.py
 tickers = get_stock_list(scrape=False)
+tickers = get_yahoo_tickers(tickers)
 df = scrape_all_tickers(tickers)
 ```
 

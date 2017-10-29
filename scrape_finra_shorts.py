@@ -91,3 +91,6 @@ if __name__ == "__main__":
                 dfs[o] = dl_and_get_df(u, o)
             else:
                 dfs[o] = dfs[o].append(dl_and_get_df(u, o))
+
+    for d in dfs:
+        pass
