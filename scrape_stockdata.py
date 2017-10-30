@@ -405,7 +405,18 @@ def scrape_all_tickers(tickers):
             # sometimes some errors while scraping
             try:
                 print('trying to scrape...')
-                df = scrape_stats(t)
+                tries = 0
+                while True:
+                    try:
+                        df = scrape_stats(t)
+                        break
+                    except AttributeError:  # happens if page isn't fully loaded
+                        print('scraping error')
+                        if tries == 2:  # three strikes and yur out
+                            break
+                        tries += 1
+                        time.sleep(1)
+
             except Exception as e:
                 print('error:', e)
                 print(traceback.print_exc())
