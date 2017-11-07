@@ -3,6 +3,12 @@ Scrapes short interest and historical daily prices for US stocks.
 
 All done on Ubuntu 16.04 64-bit.
 
+Currently getting data from FINRA, BATS
+
+TODO: need to get data from here: ftp://ftp.nasdaqtrader.com/files/shortsaledata/daily/
+ - maybe want to start getting key stats from here: https://stackoverflow.com/questions/38567661/how-to-get-key-statistics-for-yahoo-finance-web-search-api
+ but need to write new parsing function
+
 # Getting it running
 ## Install requirements
 `sudo pip3 install -r requirements.txt`

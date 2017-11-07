@@ -1,3 +1,10 @@
+"""
+scrapes data from here:
+http://regsho.finra.org/regsho-Index.html
+
+
+"""
+
 # core
 import os
 
@@ -76,21 +83,30 @@ def get_idx():
 
     return uls, month_links
 
+
+def load_current_files():
+    
+
+
+def update_data():
+
+
+
 if __name__ == "__main__":
     uls, month_links = get_idx()
-    dfs = {}
-    for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
-        dfs[o] = dl_and_get_df(u, o)
-
-
-    for m in month_links:
-        print('getting data for month', m.split('-')[-1].split('.')[0])
-        uls = get_lists(m)
-        for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
-            if dfs[o] is None:
-                dfs[o] = dl_and_get_df(u, o)
-            else:
-                dfs[o] = dfs[o].append(dl_and_get_df(u, o))
-
-    for d in dfs:
-        pass
+    # dfs = {}
+    # for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
+    #     dfs[o] = dl_and_get_df(u, o)
+    #
+    #
+    # for m in month_links:
+    #     print('getting data for month', m.split('-')[-1].split('.')[0])
+    #     uls = get_lists(m)
+    #     for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
+    #         if dfs[o] is None:
+    #             dfs[o] = dl_and_get_df(u, o)
+    #         else:
+    #             dfs[o] = dfs[o].append(dl_and_get_df(u, o))
+    #
+    # for d in dfs:
+    #     pass

@@ -159,7 +159,7 @@ def get_stock_list(scrape=True):
 
 def get_yahoo_tickers(tickers):
     # avoid weird codes that are on nasdaq site but not yahoo
-    return [t for t in tickers if '^' not in t and '.' not in t]
+    return [t for t in tickers if '^' not in t and '.' not in t and '~' not in t]
 
 
 def scrape_historical(t):
