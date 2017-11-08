@@ -7,12 +7,17 @@ http://regsho.finra.org/regsho-Index.html
 
 # core
 import os
+import glob
 
 # installed
 import requests as req
 from bs4 import BeautifulSoup as bs
 import urllib
 import pandas as pd
+from tqdm import tqdm
+
+
+FOLDERS = ['ADF', 'NASDAQ', 'NYSE', 'ORF']
 
 
 def dl_and_get_df(ul, org):
@@ -26,7 +31,7 @@ def dl_and_get_df(ul, org):
     if not os.path.exists('data/' + org):
         os.mkdir('data/' + org)
 
-    full_df = None
+    dfs = []
     for l in ul.find_all('li'):
         link = l.find('a').attrs['href']
         filename = link.split('/')[-1]
@@ -37,18 +42,17 @@ def dl_and_get_df(ul, org):
             print('empty file!')
             continue
 
-        if full_df is None:
-            full_df = df
-        else:
-            full_df = full_df.append(df)
+        dfs.append(nona)
 
-    if full_df is None:
+    if len(dfs) == 0:
         return None
+
+    full_df = pd.concat(dfs)
 
     return full_df.dropna()
 
 
-def get_lists(url):
+def get_lists(url, verbose=False):
     res = req.get(url, timeout=20)
     soup = bs(res.content, 'lxml')
     lists = soup.find_all('ul')
@@ -56,15 +60,16 @@ def get_lists(url):
     for l in lists:
         ls = l.find_all('li')
         if len(ls) < 10:
-            print('list length is', len(ls))
-            print('skipping')
+            if verbose:
+                print('list length is', len(ls))
+                print('skipping')
         else:
             uls.append(l)
 
     return uls
 
 
-def get_idx():
+def get_idx(verbose=False):
     url = 'http://regsho.finra.org/regsho-Index.html'
     res = req.get(url, timeout=20)
     soup = bs(res.content, 'lxml')
@@ -73,10 +78,15 @@ def get_idx():
     for l in lists:
         ls = l.find_all('li')
         if len(ls) < 10:
-            print('list length is', len(ls))
-            print('skipping')
+            if verbose:
+                print('list length is', len(ls))
+                print('skipping')
         else:
             uls.append(l)
+
+    if len(uls) == 0:
+        # then we skipped all the lists because it's early in the month
+        uls = lists[1:5]
 
     tables = soup.find_all('table')
     month_links = [t.attrs['href'] for t in tables[1].find_all('a')]
@@ -84,16 +94,101 @@ def get_idx():
     return uls, month_links
 
 
-def load_current_files():
-    
+def get_current_files(fullpath=False):
+    files = []
+    for f in FOLDERS:
+        if fullpath:
+            files.extend(glob.glob('data/' + f + '/*.txt'))
+        else:
+            files.extend([f.split('/')[-1] for f in glob.glob('data/' + f + '/*.txt')])
+
+    return files
 
 
-def update_data():
+def get_filenames(links):
+    fns = []
+    for l in links:
+        fns.append(l.split('/')[-1])
+
+    return fns
+
+
+def get_org(filename):
+    lookup_dict = {'FORF': 'ORF', 'FNYX': 'NYSE', 'FNRA': 'ADF', 'FNSQ': 'NASDAQ'}
+    return lookup_dict[filename[:4]]
+
+
+def update_data(check_all_months=True, verbose=False):
+    """
+    Right now kind of a brute-force approach to check all months at once.
+    A better way would be one at a time but meh.  Not that expensive to do.
+    """
+    cur_files = set(get_current_files())
+    uls, month_links = get_idx(verbose=verbose)
+
+    links = []
+    for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
+        for l in u.find_all('li'):
+            links.append(l.find('a').attrs['href'])
+
+    if check_all_months:
+        for m in month_links:
+            uls = get_lists(m, verbose=verbose)
+            for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
+                for l in u.find_all('li'):
+                    links.append(l.find('a').attrs['href'])
+
+    filenames = get_filenames(links)
+    fn_dict = {f: l for f, l in zip(filenames, links)}
+    filenames = set(filenames)
+    missing_files = filenames.difference(cur_files)
+    print('missing', len(missing_files), 'files')
+
+    for f in missing_files:
+        link = fn_dict[f]
+        org = get_org(f)
+        urllib.request.urlretrieve(link, 'data/' + org + '/' + f)
+
+
+def load_all_data(verbose=False):
+    cur_files = get_current_files(fullpath=True)
+    full_df = None
+    dfs = []
+    for f in tqdm(cur_files):
+        df = pd.read_csv(f, sep='|')
+        nona = df.dropna()
+        if df.shape != nona.shape and df.shape[0] == 1:
+            if verbose:
+                print('empty file!')
+
+            continue
+
+        dfs.append(nona)
+
+    return pd.concat(dfs)
+
+
+def process_df(full_df):
+    # if you want to separate by market...
+    # grp = full_df.groupby(['Symbol', 'Date', 'Market']).sum()
+    grp = full_df.groupby(['Symbol', 'Date']).sum()
+    # get individual stocks
+    navi = grp.loc['NAVI', :]
+    navi.index = pd.to_datetime(navi.index, format='%Y%m%d')
+    navi[(navi.index >= '2017-10-01') & (navi.index <= '2017-10-13')].sum()
+    navi[(navi.index >= '2017-10-01') & (navi.index <= '2017-10-13')].mean()
+    import matplotlib.pyplot as plt
+    plt.plot(navi.index, navi.ShortVolume)  # need to get working with plot_date
+    plt.plot(navi.index, navi.TotalVolume)
+    plt.show()
+    # combine with historical data
+
 
 
 
 if __name__ == "__main__":
-    uls, month_links = get_idx()
+    update_data(check_all_months=True)
+    # uls, month_links = get_idx()
     # dfs = {}
     # for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
     #     dfs[o] = dl_and_get_df(u, o)
