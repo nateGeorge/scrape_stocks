@@ -6,6 +6,7 @@ import datetime
 import threading
 import traceback
 import subprocess
+from bson import json_util
 # makes firefox headless: https://stackoverflow.com/a/10399597/4549682
 # subprocess.Popen('Xvfb :99 -ac &', shell=True)
 # subprocess.Popen('export DISPLAY=:99', shell=True)
@@ -16,6 +17,7 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from fake_useragent import UserAgent
 import requests as req
 from requests.exceptions import Timeout
+from OpenSSL.SSL import WantReadError
 from bs4 import BeautifulSoup as bs
 from lxml import html
 import pandas as pd
@@ -25,6 +27,7 @@ import odo
 import pytz
 from tqdm import tqdm
 import pandas_market_calendars as mcal
+from pymongo import MongoClient
 
 
 try:
@@ -450,11 +453,11 @@ def scrape_all_tickers(tickers):
     for t in tqdm(tickers):
         print(t)
         url = base_yahoo_query_url.format(t)
-        while True
+        while True:
             try:
                 res = req.get(url, timeout=10)
                 break
-            except Timeout:
+            except (Timeout, WantReadError):
                 time.sleep(2)
                 continue
 
@@ -481,29 +484,140 @@ def scrape_all_tickers(tickers):
     return full_df
 
 
+def scrape_all_tickers_mongo_linear(tickers):
+    base_yahoo_query_url = 'https://query2.finance.yahoo.com/v11/finance/quoteSummary/{}?modules=defaultKeyStatistics,assetProfile,financialData,calendarEvents,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory'
+
+    client = MongoClient()
+    db = client.yahoo_stock_data
+
+    for t in tqdm(tickers):
+        print(t)
+        url = base_yahoo_query_url.format(t)
+        while True:
+            try:
+                res = req.get(url, timeout=10)
+                break
+            except (Timeout, WantReadError):
+                time.sleep(2)
+                continue
+
+        if res.json()['quoteSummary']['result'] is None and res.json()['quoteSummary']['error']['code'] == 'Not Found':
+            print('ticker not found')
+            continue
+        else:
+            dfs = []
+            for k in res.json()['quoteSummary']['result'][0].keys():
+                dfs.append(pd.io.json.json_normalize(res.json()['quoteSummary']['result'][0][k]))
+
+            full_df = pd.concat(dfs, axis=1)
+            full_df = full_df.loc[:, ~full_df.columns.duplicated()]
+            # only keep the 'raw' columns, formatted ones are useless here
+            raw_cols = [c for c in full_df.columns if '.raw' in c]
+            full_df = full_df[raw_cols]
+            cln_cols = [c[:-4].split('.')[-1] for c in raw_cols]
+            full_df.columns = cln_cols
+            full_df['ticker'] = t
+            full_df['date'] = pd.to_datetime(datetime.datetime.now(pytz.timezone('America/New_York')).date())
+            j = full_df.to_json(orient='index')
+            data = json_util.loads(j)['0']
+            db.data.insert_one(data)
+
+
+def scrape_all_tickers_mongo_parallel(tickers):
+    base_yahoo_query_url = 'https://query2.finance.yahoo.com/v11/finance/quoteSummary/{}?modules=defaultKeyStatistics,assetProfile,financialData,calendarEvents,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory'
+
+    client = MongoClient()
+    db = client.yahoo_stock_data
+
+    from concurrent.futures.thread import ThreadPoolExecutor
+
+    with ThreadPoolExecutor() as executor:
+        for t in tickers:
+            executor.submit(scrape_a_ticker_mongo, base_yahoo_query_url, t, db)
+    # old way of doing it, and wasn't working great
+    # for ti in tiks:
+    #     for t in ti:
+    #         threads = []
+    #         th = threading.Thread(target=scrape_a_ticker_mongo, args=(base_yahoo_query_url, t, db))
+    #         th.start()
+    #         threads.append(th)
+    #
+    #         for th in threads:
+    #             th.join()
+
+
+def scrape_a_ticker_mongo(base_yahoo_url, t, db):
+    print(t)
+    url = base_yahoo_query_url.format(t)
+    while True:
+        try:
+            res = req.get(url, timeout=10)
+            break
+        except (Timeout, WantReadError):
+            time.sleep(2)
+            continue
+
+    if res.json()['quoteSummary']['result'] is None and res.json()['quoteSummary']['error']['code'] == 'Not Found':
+        print('ticker not found')
+        return
+    else:
+        dfs = []
+        for k in res.json()['quoteSummary']['result'][0].keys():
+            dfs.append(pd.io.json.json_normalize(res.json()['quoteSummary']['result'][0][k]))
+
+        full_df = pd.concat(dfs, axis=1)
+        full_df = full_df.loc[:, ~full_df.columns.duplicated()]
+        # only keep the 'raw' columns, formatted ones are useless here
+        raw_cols = [c for c in full_df.columns if '.raw' in c]
+        full_df = full_df[raw_cols]
+        cln_cols = [c[:-4].split('.')[-1] for c in raw_cols]
+        full_df.columns = cln_cols
+        full_df['ticker'] = t
+        full_df['date'] = pd.to_datetime(datetime.datetime.now(pytz.timezone('America/New_York')).date())
+        j = full_df.to_json(orient='index')
+        data = json_util.loads(j)['0']
+        db.data.insert_one(data)
+
+
 def check_market_status():
     """
     Checks to see if market is open today.
     Uses the pandas_market_calendars package as mcal
     """
-    today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
+    # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
+    today_utc = pd.to_datetime('today')
     ndq = mcal.get_calendar('NASDAQ')
-    open_days = ndq.schedule(start_date=today - pd.Timedelta('10 days'), end_date=today)
-    if today in open_days.index:
-        return True
-
-    else return False
+    open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_utc)
+    if today_utc in open_days.index:
+        return open_days
+    else:
+        return None
 
 
 def daily_scrape_data():
     """
-    checks if the market was open
+    checks if the market is open today or if we haven't scraped yet today,
+    every hour.  If we haven't, scrapes data into the mongodb.
     """
-    while True
+    last_scrape = None
+    while True:
+        today_utc = pd.to_datetime('now')
+        # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
+        if last_scrape != today_utc:
+            open_days = check_market_status()
+            if open_days is not None:
+                if today_utc.hour > open_days.loc[today_utc.date()]['market_close'].hour:
+                    latest_scrape = today_utc
+                    scrape_all_tickers_mongo_parallel()
+            else:
+                print('waiting 1 hour...')
+                time.sleep(3600)  # wait 1 hour
+        else:
+            print('waiting 1 hour...')
+            time.sleep(3600)
 
 
-
-def scrape_all_tickers_mongo(tickers):
+def scrape_all_tickers_mongo_old(tickers):
     full_df = None
     for t in tickers:
         print(t)
@@ -547,16 +661,21 @@ def scrape_all_tickers_mongo(tickers):
     client.close()
 
 
-def scrape_tickers_threads(tickers):
-    """
-    need to write to a mongodb before implementing this, for concurrent writes
-    """
-    num_chunks = 90
+def get_ticker_chunks(tickers, num_chunks=90):
     tik = np.array(tickers)
     chunk_size = tik.shape[0] // num_chunks
     tiks = list(np.split(tik[:num_chunks * chunk_size], num_chunks))
     if chunk_size != tik.shape[0] / num_chunks:
         tiks.append(tik[chunk_size * num_chunks:])
+
+    return tiks
+
+
+def scrape_tickers_threads(tickers):
+    """
+    need to write to a mongodb before implementing this, for concurrent writes
+    """
+    tiks = get_ticker_chunks(tickers)
 
     threads = []
     for ti in tiks:
