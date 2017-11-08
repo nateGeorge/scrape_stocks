@@ -15,12 +15,16 @@ from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from fake_useragent import UserAgent
 import requests as req
+from requests.exceptions import Timeout
 from bs4 import BeautifulSoup as bs
 from lxml import html
 import pandas as pd
 import numpy as np
 from pymongo import MongoClient
 import odo
+import pytz
+from tqdm import tqdm
+import pandas_market_calendars as mcal
 
 
 try:
@@ -396,7 +400,7 @@ def scrape_stats_mongo(t):
     return pd.DataFrame(ss_dict, index=[0])
 
 
-def scrape_all_tickers(tickers):
+def scrape_all_tickers_old(tickers):
     full_df = None
     for t in tickers:
         print(t)
@@ -437,6 +441,66 @@ def scrape_all_tickers(tickers):
     # full_df['Forward P/E'] = full_df['Forward P/E'].astype(np.float64)
 
     return full_df
+
+
+def scrape_all_tickers(tickers):
+    base_yahoo_query_url = 'https://query2.finance.yahoo.com/v11/finance/quoteSummary/{}?modules=defaultKeyStatistics,assetProfile,financialData,calendarEvents,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory'
+
+    all_dfs = []
+    for t in tqdm(tickers):
+        print(t)
+        url = base_yahoo_query_url.format(t)
+        while True
+            try:
+                res = req.get(url, timeout=10)
+                break
+            except Timeout:
+                time.sleep(2)
+                continue
+
+        if res.json()['quoteSummary']['result'] is None and res.json()['quoteSummary']['error']['code'] == 'Not Found':
+            print('ticker not found')
+            continue
+        else:
+            dfs = []
+            for k in res.json()['quoteSummary']['result'][0].keys():
+                dfs.append(pd.io.json.json_normalize(res.json()['quoteSummary']['result'][0][k]))
+
+            full_df = pd.concat(dfs, axis=1)
+            full_df = full_df.loc[:, ~full_df.columns.duplicated()]
+            # only keep the 'raw' columns, formatted ones are useless here
+            raw_cols = [c for c in full_df.columns if '.raw' in c]
+            full_df = full_df[raw_cols]
+            cln_cols = [c[:-4] for c in raw_cols]
+            full_df.columns = cln_cols
+            full_df['ticker'] = t
+            full_df['date'] = pd.to_datetime(datetime.datetime.now(pytz.timezone('America/New_York')).date())
+            all_dfs.append(full_df)
+
+    full_df = pd.concat(all_dfs)
+    return full_df
+
+
+def check_market_status():
+    """
+    Checks to see if market is open today.
+    Uses the pandas_market_calendars package as mcal
+    """
+    today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
+    ndq = mcal.get_calendar('NASDAQ')
+    open_days = ndq.schedule(start_date=today - pd.Timedelta('10 days'), end_date=today)
+    if today in open_days.index:
+        return True
+
+    else return False
+
+
+def daily_scrape_data():
+    """
+    checks if the market was open
+    """
+    while True
+
 
 
 def scrape_all_tickers_mongo(tickers):
@@ -505,6 +569,24 @@ def scrape_tickers_threads(tickers):
 
 # TODO: check for errors.  For example, the MACK data was showing 25M short shares, but 23% short of float (11M).  The % of float seems to be correct here, or at least agree with shortsqueeze.common
 # scrape nasdaq and check for consistency
+
+
+
+
+def load_all_data():
+    """
+    loads all csvs from website scraping
+    """
+    files = glob.glob('data/yahoo_key_stats/*.csv.gz')
+    dfs = []
+    for f in files:
+        df = pd.read_csv(f)
+        df['date'] = pd.to_datetime(f.split('/')[-1].split('_')[-1].split('.')[0])
+        dfs.append(df)
+
+    full_df = pd.concat(dfs)
+    grp = full_df.groupby(['ticker', 'date']).sum()
+    navi = grp.loc['NAVI', :]
 
 
 def calc_short_things(full_df):
