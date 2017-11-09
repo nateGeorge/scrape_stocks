@@ -158,7 +158,6 @@ def update_data(check_all_months=True, verbose=False):
 
 def load_all_data(verbose=False):
     cur_files = get_current_files(fullpath=True)
-    full_df = None
     dfs = []
     for f in tqdm(cur_files):
         df = pd.read_csv(f, sep='|')
@@ -171,7 +170,9 @@ def load_all_data(verbose=False):
 
         dfs.append(nona)
 
-    return pd.concat(dfs)
+    full_df = pd.concat(dfs)
+    full_df['Date'] = pd.to_datetime(full_df['Date'], format='%Y%m%d')
+    return full_df
 
 
 def process_df(full_df):
