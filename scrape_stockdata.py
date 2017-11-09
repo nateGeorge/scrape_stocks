@@ -527,7 +527,7 @@ def scrape_all_tickers_mongo_parallel(tickers=None):
     if tickers is None:
         tickers = get_stock_list(scrape=False)
         tickers = get_yahoo_tickers(tickers)
-    
+
     base_yahoo_query_url = 'https://query2.finance.yahoo.com/v11/finance/quoteSummary/{}?modules=defaultKeyStatistics,assetProfile,financialData,calendarEvents,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory'
 
     client = MongoClient()
@@ -607,21 +607,24 @@ def daily_scrape_data():
     while True:
         today_utc = pd.to_datetime('now')
         # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
-        if last_scrape != today_utc:
+        if last_scrape != today_utc.date():
             open_days = check_market_status()
             if open_days is not None:
                 if today_utc.hour > open_days.loc[today_utc.date()]['market_close'].hour:
-                    latest_scrape = today_utc
+                    latest_scrape = today_utc.date()
                     print('scraping...')
                     scrape_all_tickers_mongo_parallel()
                 else:
-                    print('waiting 1 hour...')
+                    # need to make it wait number of hours until close
+                    print('waiting for market to close, waiting 1 hour...')
                     time.sleep(3600)
             else:
-                print('waiting 1 hour...')
+                # need to wait till market will be open then closed next
+                print('market closed today, waiting 1 hour...')
                 time.sleep(3600)  # wait 1 hour
         else:
-            print('waiting 1 hour...')
+            # need to make this more intelligent so it waits until the next day
+            print('already scraped today, waiting 1 hour to check again...')
             time.sleep(3600)
 
 
