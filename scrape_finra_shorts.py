@@ -8,6 +8,7 @@ http://regsho.finra.org/regsho-Index.html
 # core
 import os
 import glob
+import time
 
 # installed
 import requests as req
@@ -16,7 +17,11 @@ import urllib
 import pandas as pd
 from tqdm import tqdm
 
+# custom
+import scrape_stockdata as ss
+from utils import get_home_dir
 
+HOME_DIR = get_home_dir(repo_name='scrape_stocks')
 FOLDERS = ['ADF', 'NASDAQ', 'NYSE', 'ORF']
 
 
@@ -97,10 +102,11 @@ def get_idx(verbose=False):
 def get_current_files(fullpath=False):
     files = []
     for f in FOLDERS:
+        filenames = HOME_DIR + 'data/' + f + '/*.txt'
         if fullpath:
-            files.extend(glob.glob('data/' + f + '/*.txt'))
+            files.extend(glob.glob(filenames))
         else:
-            files.extend([f.split('/')[-1] for f in glob.glob('data/' + f + '/*.txt')])
+            files.extend([f.split('/')[-1] for f in glob.glob(filenames)])
 
     return files
 
@@ -184,6 +190,36 @@ def process_df(full_df):
     # combine with historical data
 
 
+def daily_scrape_data():
+    """
+    checks if the market is open today or if we haven't scraped yet today,
+    every hour.  If we haven't, scrapes data into the mongodb.
+
+    basically the same as the function in scrape_stockdata.py
+    """
+    last_scrape = None
+    while True:
+        today_utc = pd.to_datetime('now')
+        # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
+        if last_scrape != today_utc.date():
+            open_days = ss.check_market_status()
+            if open_days is not None:
+                if today_utc.hour > open_days.loc[today_utc.date()]['market_close'].hour:
+                    latest_scrape = today_utc.date()
+                    print('scraping...')
+                    update_data(check_all_months=True)
+                else:
+                    # need to make it wait number of hours until close
+                    print('waiting for market to close, waiting 1 hour...')
+                    time.sleep(3600)
+            else:
+                # need to wait till market will be open then closed next
+                print('market closed today, waiting 1 hour...')
+                time.sleep(3600)  # wait 1 hour
+        else:
+            # need to make this more intelligent so it waits until the next day
+            print('already scraped today, waiting 1 hour to check again...')
+            time.sleep(3600)
 
 
 if __name__ == "__main__":
