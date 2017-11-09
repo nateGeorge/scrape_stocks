@@ -523,7 +523,11 @@ def scrape_all_tickers_mongo_linear(tickers):
             db.data.insert_one(data)
 
 
-def scrape_all_tickers_mongo_parallel(tickers):
+def scrape_all_tickers_mongo_parallel(tickers=None):
+    if tickers is None:
+        tickers = get_stock_list(scrape=False)
+        tickers = get_yahoo_tickers(tickers)
+    
     base_yahoo_query_url = 'https://query2.finance.yahoo.com/v11/finance/quoteSummary/{}?modules=defaultKeyStatistics,assetProfile,financialData,calendarEvents,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory'
 
     client = MongoClient()
@@ -585,7 +589,7 @@ def check_market_status():
     Uses the pandas_market_calendars package as mcal
     """
     # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
-    today_utc = pd.to_datetime('today')
+    today_utc = pd.to_datetime('now').date()
     ndq = mcal.get_calendar('NASDAQ')
     open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_utc)
     if today_utc in open_days.index:
@@ -608,7 +612,11 @@ def daily_scrape_data():
             if open_days is not None:
                 if today_utc.hour > open_days.loc[today_utc.date()]['market_close'].hour:
                     latest_scrape = today_utc
+                    print('scraping...')
                     scrape_all_tickers_mongo_parallel()
+                else:
+                    print('waiting 1 hour...')
+                    time.sleep(3600)
             else:
                 print('waiting 1 hour...')
                 time.sleep(3600)  # wait 1 hour
