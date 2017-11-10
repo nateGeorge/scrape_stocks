@@ -611,7 +611,7 @@ def daily_scrape_data():
             open_days = check_market_status()
             if open_days is not None:
                 if today_utc.hour > open_days.loc[today_utc.date()]['market_close'].hour:
-                    latest_scrape = today_utc.date()
+                    last_scrape = today_utc.date()
                     print('scraping...')
                     scrape_all_tickers_mongo_parallel()
                 else:
