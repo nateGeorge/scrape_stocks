@@ -28,6 +28,8 @@ import pytz
 from tqdm import tqdm
 import pandas_market_calendars as mcal
 from pymongo import MongoClient
+from concurrent.futures.thread import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 
 try:
@@ -38,7 +40,8 @@ except:
 
 
 BASE_URL = 'http://www.nasdaq.com/'
-DB = 'stock_data'
+# DB = 'yahoo_test'
+DB = 'yahoo_stock_data'
 
 
 def setup_driver(backend='FF'):
@@ -487,9 +490,6 @@ def scrape_all_tickers(tickers):
 def scrape_all_tickers_mongo_linear(tickers):
     base_yahoo_query_url = 'https://query2.finance.yahoo.com/v11/finance/quoteSummary/{}?modules=defaultKeyStatistics,assetProfile,financialData,calendarEvents,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory'
 
-    client = MongoClient()
-    db = client.yahoo_stock_data
-
     for t in tqdm(tickers):
         print(t)
         url = base_yahoo_query_url.format(t)
@@ -530,14 +530,24 @@ def scrape_all_tickers_mongo_parallel(tickers=None):
 
     base_yahoo_query_url = 'https://query2.finance.yahoo.com/v11/finance/quoteSummary/{}?modules=defaultKeyStatistics,assetProfile,financialData,calendarEvents,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory'
 
-    client = MongoClient()
-    db = client.yahoo_stock_data
+    # get market data date
+    today_utc = pd.to_datetime('now').date()
+    ndq = mcal.get_calendar('NASDAQ')
+    open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_utc)
+    data_date = open_days.iloc[-1]['market_close'].value
 
-    from concurrent.futures.thread import ThreadPoolExecutor
-
-    with ThreadPoolExecutor() as executor:
+    jobs = []
+    with ProcessPoolExecutor(max_workers=None) as executor:
         for t in tickers:
-            executor.submit(scrape_a_ticker_mongo, base_yahoo_query_url, t, db)
+            r = executor.submit(scrape_a_ticker_mongo,
+                                base_yahoo_query_url,
+                                t,
+                                data_date)
+            jobs.append((t, r))
+
+    for t, r in jobs:
+        if r.result() is not None:
+            print('ticker:', t, 'result:', r.result())
     # old way of doing it, and wasn't working great
     # for ti in tiks:
     #     for t in ti:
@@ -550,21 +560,30 @@ def scrape_all_tickers_mongo_parallel(tickers=None):
     #             th.join()
 
 
-def scrape_a_ticker_mongo(base_yahoo_url, t, db):
+def scrape_a_ticker_mongo(base_yahoo_query_url, t, data_date):
     print(t)
     url = base_yahoo_query_url.format(t)
     while True:
-        try:
+        delay = 2
+        try:  # problem: BCACW, CERCW, CYTXW
             res = req.get(url, timeout=10)
+            if not res.ok and res.status_code != 404:  # 404 error if stock not found
+                time.sleep(delay)
+                delay = delay * 2
+                continue
+
             break
         except (Timeout, WantReadError):
-            time.sleep(2)
+            time.sleep(delay)
+            delay = delay * 2
             continue
 
     if res.json()['quoteSummary']['result'] is None and res.json()['quoteSummary']['error']['code'] == 'Not Found':
         print('ticker not found')
         return
     else:
+        client = MongoClient()
+        db = client[DB]
         dfs = []
         for k in res.json()['quoteSummary']['result'][0].keys():
             dfs.append(pd.io.json.json_normalize(res.json()['quoteSummary']['result'][0][k]))
@@ -577,10 +596,13 @@ def scrape_a_ticker_mongo(base_yahoo_url, t, db):
         cln_cols = [c[:-4].split('.')[-1] for c in raw_cols]
         full_df.columns = cln_cols
         full_df['ticker'] = t
-        full_df['date'] = pd.to_datetime(datetime.datetime.now(pytz.timezone('America/New_York')).date())
+        # date used to be scrape date, but now is date of last close
+        # full_df['date'] = pd.to_datetime(datetime.datetime.now(pytz.timezone('America/New_York')).date())
+        full_df['date'] = data_date
         j = full_df.to_json(orient='index')
         data = json_util.loads(j)['0']
-        db.data.insert_one(data)
+        res = db.data.insert_one(data)
+        client.close()
 
 
 def check_market_status():
@@ -701,6 +723,58 @@ def scrape_tickers_threads(tickers):
 # scrape nasdaq and check for consistency
 
 
+def backup_db():
+    # need to run mongo and do:
+    # use yahoo_stock_data_bkup
+    # db.dropDatabase()
+    # db.copyDatabase('yahoo_stock_data', 'yahoo_stock_data_bkup')
+    client = MongoClient()
+    client.drop_database('yahoo_stock_data_bkup')
+    client.admin.command('copydb',
+                         fromdb='yahoo_stock_data',
+                         todb='yahoo_stock_data_bkup')
+    client.close()
+
+
+
+def restore_backup():
+    # need to run mongo and do:
+    # db.copyDatabase('yahoo_stock_data_bkup', 'yahoo_stock_data')
+    client = MongoClient()
+    client.drop_database('yahoo_stock_data')
+    client.admin.command('copydb',
+                         fromdb='yahoo_stock_data_bkup',
+                         todb='yahoo_stock_data')
+    client.close()
+
+
+def clean_dupes():
+    # fucking difficult to figure out:
+    # https://stackoverflow.com/questions/14184099/fastest-way-to-remove-duplicate-documents-in-mongodb
+
+    client = MongoClient()
+    db = client[DB]
+    pipeline = [
+        {'$group': { '_id': {'ticker': '$ticker', '52WeekChange': '$52WeekChange'}, 'doc' : {'$first': '$$ROOT'}}},
+        {'$replaceRoot': { 'newRoot': '$doc'}},
+        {'$out': 'data'}
+    ]
+    db.command('aggregate', 'data', pipeline=pipeline, allowDiskUse=True)
+    client.close()
+
+    # works in mongo
+    # db.data.aggregate([
+    # {
+    #     $group: { "_id": {'ticker': '$ticker', '52WeekChange': '$52WeekChange'}, "doc" : {"$first": "$$ROOT"}}
+    # },
+    # {
+    #     $replaceRoot: { "newRoot": "$doc"}
+    # },
+    # {
+    #     $out: 'data'
+    # }
+    # ],
+    # {allowDiskUse:true})
 
 
 def load_all_data():
