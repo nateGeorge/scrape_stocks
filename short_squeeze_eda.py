@@ -13,7 +13,7 @@ from utils import get_home_dir
 
 HOME_DIR = get_home_dir(repo_name='scrape_stocks')
 
-def stuff(f, dates_df, rev_cal_dict):
+def load_parse_excel(f, dates_df, rev_cal_dict):
     print(f)
     df = pd.read_excel(f)
     # fixes truecar ticker error; is listed as '1' in the data
@@ -69,7 +69,7 @@ def load_all_short_squeeze_data(load_old=True):
     jobs = []
     with ProcessPoolExecutor(max_workers=None) as executor:
         for f in files:
-            r = executor.submit(stuff,
+            r = executor.submit(load_parse_excel,
                                 f,
                                 dates_df,
                                 rev_cal_dict)
