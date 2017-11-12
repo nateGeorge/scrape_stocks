@@ -625,6 +625,7 @@ def daily_scrape_data():
     checks if the market is open today or if we haven't scraped yet today,
     every hour.  If we haven't, scrapes data into the mongodb.
     """
+    # TODO: check if was scraped last open date and if not and market is closed, scrape
     last_scrape = None
     while True:
         today_utc = pd.to_datetime('now')
@@ -736,7 +737,6 @@ def backup_db():
     client.close()
 
 
-
 def restore_backup():
     # need to run mongo and do:
     # db.copyDatabase('yahoo_stock_data_bkup', 'yahoo_stock_data')
@@ -755,7 +755,7 @@ def clean_dupes():
     client = MongoClient()
     db = client[DB]
     pipeline = [
-        {'$group': { '_id': {'ticker': '$ticker', '52WeekChange': '$52WeekChange'}, 'doc' : {'$first': '$$ROOT'}}},
+        {'$group': { '_id': {'ticker': '$ticker', 'date': '$date'}, 'doc' : {'$first': '$$ROOT'}}},
         {'$replaceRoot': { 'newRoot': '$doc'}},
         {'$out': 'data'}
     ]
@@ -791,6 +791,11 @@ def load_all_data():
     full_df = pd.concat(dfs)
     grp = full_df.groupby(['ticker', 'date']).sum()
     navi = grp.loc['NAVI', :]
+
+
+client = MongoClient()
+db = client[DB]
+
 
 
 def calc_short_things(full_df):
