@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup as bs
 import urllib
 import pandas as pd
 from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor
 
 # custom
 import scrape_stockdata as ss
@@ -156,19 +157,32 @@ def update_data(check_all_months=True, verbose=False):
         urllib.request.urlretrieve(link, 'data/' + org + '/' + f)
 
 
+def read_file_to_df(f, verbose):
+    df = pd.read_csv(f, sep='|')
+    nona = df.dropna()
+    if df.shape != nona.shape and df.shape[0] == 1:
+        if verbose:
+            print('empty file!')
+
+        return None
+
+    return nona
+
+
 def load_all_data(verbose=False):
     cur_files = get_current_files(fullpath=True)
     dfs = []
-    for f in tqdm(cur_files):
-        df = pd.read_csv(f, sep='|')
-        nona = df.dropna()
-        if df.shape != nona.shape and df.shape[0] == 1:
-            if verbose:
-                print('empty file!')
+    jobs = []
+    with ProcessPoolExecutor(max_workers=None) as executor:
+        for f in cur_files:
+            r = executor.submit(read_file_to_df,
+                                f,
+                                verbose)
+            jobs.append((f, r))
 
-            continue
-
-        dfs.append(nona)
+    for f, r in jobs:
+        if r.result() is not None:
+            dfs.append(r.result())
 
     full_df = pd.concat(dfs)
     full_df['Date'] = pd.to_datetime(full_df['Date'], format='%Y%m%d')
