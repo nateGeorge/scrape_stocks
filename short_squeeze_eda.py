@@ -43,6 +43,8 @@ def load_parse_excel(f, dates_df, rev_cal_dict):
                     str(t_df[t_df[int(year)] == (month + ' ' + ab)]['NASDAQ®'].values[0]).zfill(2)])
     date = pd.to_datetime(date, format='%Y-%m-%d')
     df['Date'] = date
+    if df['Symbol'].str.contains('AA-').sum() != 0:
+        print('contains AA-:', f)
 
     return df
 
@@ -112,9 +114,13 @@ def get_short_interest_data(full_df=None):
     return full_df[cols].rename(columns={'Short Squeeze Ranking™': 'Short Squeeze Ranking'})
 
 
-def get_stocks():
+def get_stocks(ignore_plus_minus=True):
     """
     returns stocks with data from shortsqueeze.com
     """
     full_df = load_all_short_squeeze_data()
-    return full_df['Symbol'].unique()
+    stks = sorted(full_df['Symbol'].unique())
+    if ignore_plus_minus:
+        stks = [s for s in stks if s[-1] not in ['+', '-']]
+    
+    return stks
