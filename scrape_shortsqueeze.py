@@ -41,6 +41,24 @@ def scrape_stuff():
         soup.find_all({'class': 'hyper13'})
 
 
+def get_years():
+    """
+    gets available years from the title bar
+    """
+
+
+def check_for_new_excel():
+    """
+    checks for new excel files to download, and if they aren't in the data folder,
+    downloads them
+    """
+
+
+def download_new_excel():
+    if check_for_new_excel():
+        # download file here
+
+
 def setup_driver(backend='FF'):
     """
     :param backend: string, one of FF, PH, CH (firefox, phantom, or chrome)
@@ -84,6 +102,12 @@ def setup_driver(backend='FF'):
     return driver
 
 
+def download_daily_data():
+    """
+    checks which files already exist, then downloads remaining files to bring up to current
+    """
+
+
 def log_in(driver):
     driver.get(login_url)
     time.sleep(1 + np.random.rand())  # should add WebDriverWait
@@ -96,12 +120,15 @@ def log_in(driver):
     signIn.click()
 
 
-
-
 if __name__ == "__main__":
     driver = setup_driver()
     log_in(driver)
     time.sleep(5)  # wait for login to complete...could also use some element detection
+
+
+    # scrapes daily data
+    # TODO: put into function, also make daily checker function
+    # - check which files already exist, and start on the next date
     today_utc = pd.to_datetime('now')
     # was thinking about using NY time, but mcal is in UTC
     # local_tz = pytz.timezone('America/New_York')
