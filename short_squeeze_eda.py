@@ -33,10 +33,23 @@ def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
     # drop the end junk, and the fully missing rows (usually 2 at the end)
     df = df.iloc[:end_idxs[0]]
     df.drop(df.index[df.isnull().all(1)], inplace=True)
-    # get the date from the dates_df
-    date = f.split('/')[-1][9:16]
+    df['Date'] = parse_bimo_dates(filename, dates_df, rev_cal_dict)
+    if df['Symbol'].str.contains('AA-').sum() != 0 and verbose:
+        print('contains AA-:', f)
+
+    return df
+
+
+def parse_bimo_dates(filename, dates_df, rev_cal_dict):
+    """
+    gets date from release dates dataframe and filename
+    """
+    # get the date from the dates_df and filename
+    # old way of doing it which worked before the effed up filenames with an extra 0 in nov 2017...
+    # date = f.split('/')[-1][9:16]
+    date = filename.split('/')[-1].split('-')[0].split('.')[1]
     year = date[:4]
-    month_num = int(date[4:6])
+    month_num = int(date[-3:-1])
     month = rev_cal_dict[month_num]
     ab = date[-1].upper()
     t_df = dates_df[year]
@@ -44,21 +57,19 @@ def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
                     str(month_num).zfill(2),
                     str(t_df[t_df[int(year)] == (month + ' ' + ab)]['NASDAQ®'].values[0]).zfill(2)])
     date = pd.to_datetime(date, format='%Y-%m-%d')
-    df['Date'] = date
-    if df['Symbol'].str.contains('AA-').sum() != 0:
-        print('contains AA-:', f)
-
-    return df
+    return date
 
 
-def load_all_short_squeeze_data(load_cached=True):
+def load_all_short_squeeze_data(load_cached=True, verbose=False, debug=False):
     """
     loads all historical data
     :param load_cached: boolean, if true, will load an existing h5 file
     """
     filename = HOME_DIR + 'short_squeeze_data.h5'
-    if os.path.exists(filename) and load_cached:
-        return pd.read_hdf(filename)
+    if os.path.exists(filename):
+        cached_df = pd.read_hdf(filename)
+    if load_cached:
+        return cached_df
 
     cal_dict = {v: k for k, v in enumerate(calendar.month_name)}
     del cal_dict['']
@@ -66,22 +77,43 @@ def load_all_short_squeeze_data(load_cached=True):
 
     dates_df = pd.read_excel(HOME_DIR + 'short_squeeze_release_dates.xlsx', None)
 
-    dfs = []
-    files = glob.glob(HOME_DIR + 'data/short_squeeze.com/*.xlsx')
+    # check if any files are newer than the latest date
+    latest_date = cached_df['Date'].max()
+    bimonthly_files = glob.glob(HOME_DIR + 'data/short_squeeze.com/*.xlsx')
+    bimo_dates = [parse_bimo_dates(f, dates_df, rev_cal_dict) for f in bimonthly_files]
+
+    # get latest date from daily scrapes
+    daily_files = glob.glob(HOME_DIR + 'data/short_squeeze_daily/*.csv')
+    daily_dates = [pd.to_datetime(f.split('/')[-1].split('.')[0]) for f in daily_files]
+
+    latest_file_date = max(bimo_dates + daily_dates)
+    latest_cache_date = cached_df['Date'].max()
+    if latest_cache_date == latest_file_date:
+        return cached_df
+
 
     dfs = []
-    jobs = []
-    with ProcessPoolExecutor(max_workers=None) as executor:
-        for f in files:
-            r = executor.submit(load_parse_excel,
-                                f,
-                                dates_df,
-                                rev_cal_dict)
-            jobs.append((f, r))
 
-    for f, r in jobs:
-        if r.result() is not None:
-            dfs.append(r.result())
+    dfs = []
+    if debug:
+        for f in bimonhtly_files:
+            df = load_parse_excel(f, dates_df, rev_cal_dict, verbose)
+            dfs.append(df)
+    else:
+        jobs = []
+        with ProcessPoolExecutor(max_workers=None) as executor:
+            for f in bimonthly_files:
+                r = executor.submit(load_parse_excel,
+                                    f,
+                                    dates_df,
+                                    rev_cal_dict,
+                                    verbose)
+                jobs.append((f, r))
+
+        for f, r in jobs:
+            print(r)
+            if r.result() is not None:
+                dfs.append(r.result())
 
     full_df = pd.concat(dfs)
     drop_cols = ['Record Date',
@@ -99,9 +131,9 @@ def load_all_short_squeeze_data(load_cached=True):
     return full_df
 
 
-def get_short_interest_data(full_df=None, load_cached=False):
+def get_short_interest_data(full_df=None, load_cached=False, debug=False):
     if full_df is None:
-        full_df = load_all_short_squeeze_data(load_cached=load_cached)
+        full_df = load_all_short_squeeze_data(load_cached=load_cached, debug=debug)
 
     cols = ['Symbol',
             'Date',
