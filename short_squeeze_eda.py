@@ -13,8 +13,10 @@ from utils import get_home_dir
 
 HOME_DIR = get_home_dir(repo_name='scrape_stocks')
 
-def load_parse_excel(f, dates_df, rev_cal_dict):
-    print(f)
+def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
+    if verbose:
+        print(f)
+
     df = pd.read_excel(f)
     # fixes truecar ticker error; is listed as '1' in the data
     tc_idx = df[df['ShortSqueeze.com™ Short Interest Data'] == 'Truecar Incorporated'].index[0]
@@ -24,7 +26,7 @@ def load_parse_excel(f, dates_df, rev_cal_dict):
     # end_idxs = df.index[df.iloc[:, 0].str.contains('ShortSqueeze.com: Master Spreadsheet', case=False).fillna(False) | df.iloc[:, 0].str.contains('ShortSqueeze.comï¿½: Master Spreadsheetï¿½ ', case=False).fillna(False)]
     end_idxs = df.index[df.iloc[:, 0].str.contains('Master Spreadsheet', case=False).fillna(False)]
     if len(end_idxs) > 1:
-        print('WARNING: matched more than 1 end index')
+        print('WARNING: matched more than 1 end index at end of spreadsheet')
     elif len(end_idxs) < 1:
         print('WARNING: no end index found for:', f)
 
@@ -49,13 +51,13 @@ def load_parse_excel(f, dates_df, rev_cal_dict):
     return df
 
 
-def load_all_short_squeeze_data(load_old=True):
+def load_all_short_squeeze_data(load_cached=True):
     """
     loads all historical data
-    :param load_old: boolean, if true, will load an existing h5 file
+    :param load_cached: boolean, if true, will load an existing h5 file
     """
     filename = HOME_DIR + 'short_squeeze_data.h5'
-    if os.path.exists(filename) and load_old:
+    if os.path.exists(filename) and load_cached:
         return pd.read_hdf(filename)
 
     cal_dict = {v: k for k, v in enumerate(calendar.month_name)}
@@ -97,9 +99,9 @@ def load_all_short_squeeze_data(load_old=True):
     return full_df
 
 
-def get_short_interest_data(full_df=None):
+def get_short_interest_data(full_df=None, load_cached=False):
     if full_df is None:
-        full_df = load_all_short_squeeze_data()
+        full_df = load_all_short_squeeze_data(load_cached=load_cached)
 
     cols = ['Symbol',
             'Date',
@@ -114,13 +116,20 @@ def get_short_interest_data(full_df=None):
     return full_df[cols].rename(columns={'Short Squeeze Ranking™': 'Short Squeeze Ranking'})
 
 
-def get_stocks(ignore_plus_minus=True):
+def get_stocks(ignore_plus_minus=True, load_cached=False):
     """
     returns stocks with data from shortsqueeze.com
     """
-    full_df = load_all_short_squeeze_data()
+    full_df = load_all_short_squeeze_data(load_cached=load_cached)
     stks = sorted(full_df['Symbol'].unique())
     if ignore_plus_minus:
         stks = [s for s in stks if s[-1] not in ['+', '-']]
-    
+
     return stks
+
+
+def get_daily_files():
+    """
+    gets list of daily files and return latest date
+    """
+    files = glob.glob(HOME_DIR + 'data/short_squeeze_daily/*.csv')
