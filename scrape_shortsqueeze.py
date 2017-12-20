@@ -96,6 +96,8 @@ def log_in(driver):
     signIn.click()
 
 
+
+
 if __name__ == "__main__":
     driver = setup_driver()
     log_in(driver)
