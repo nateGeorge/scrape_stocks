@@ -546,7 +546,9 @@ def scrape_all_tickers_mongo_parallel(tickers=None):
             jobs.append((t, r))
 
     for t, r in jobs:
-        if r.result() is not None:
+        if r is None:
+            print('ticker:', t, 'job result is None')
+        elif r.result() is not None:
             print('ticker:', t, 'result:', r.result())
     # old way of doing it, and wasn't working great
     # for ti in tiks:
