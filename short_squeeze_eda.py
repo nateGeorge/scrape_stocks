@@ -60,7 +60,7 @@ def parse_bimo_dates(filename, dates_df, rev_cal_dict):
     return date
 
 
-def load_all_short_squeeze_data(load_cached=True, verbose=False, debug=False):
+def load_all_short_squeeze_data(verbose=False, debug=False):
     """
     loads all historical data
     :param load_cached: boolean, if true, will load an existing h5 file
@@ -68,8 +68,6 @@ def load_all_short_squeeze_data(load_cached=True, verbose=False, debug=False):
     filename = HOME_DIR + 'short_squeeze_data.h5'
     if os.path.exists(filename):
         cached_df = pd.read_hdf(filename)
-    if load_cached:
-        return cached_df
 
     cal_dict = {v: k for k, v in enumerate(calendar.month_name)}
     del cal_dict['']
@@ -131,9 +129,9 @@ def load_all_short_squeeze_data(load_cached=True, verbose=False, debug=False):
     return full_df
 
 
-def get_short_interest_data(full_df=None, load_cached=False, debug=False):
+def get_short_interest_data(full_df=None, debug=False):
     if full_df is None:
-        full_df = load_all_short_squeeze_data(load_cached=load_cached, debug=debug)
+        full_df = load_all_short_squeeze_data(debug=debug)
 
     cols = ['Symbol',
             'Date',
@@ -148,11 +146,11 @@ def get_short_interest_data(full_df=None, load_cached=False, debug=False):
     return full_df[cols].rename(columns={'Short Squeeze Ranking™': 'Short Squeeze Ranking'})
 
 
-def get_stocks(ignore_plus_minus=True, load_cached=False):
+def get_stocks(ignore_plus_minus=True):
     """
     returns stocks with data from shortsqueeze.com
     """
-    full_df = load_all_short_squeeze_data(load_cached=load_cached)
+    full_df = load_all_short_squeeze_data()
     stks = sorted(full_df['Symbol'].unique())
     if ignore_plus_minus:
         stks = [s for s in stks if s[-1] not in ['+', '-']]
