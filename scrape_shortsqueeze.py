@@ -45,17 +45,29 @@ def scrape_stuff():
         soup.find_all({'class': 'hyper13'})
 
 
-def get_years():
+def get_years(driver):
     """
     gets available years from the title bar
     """
+    menu_bar = driver.find_element_by_xpath('/html/body/div/table[9]/tbody/tr/td/div/table')
+    years = menu_bar.text.split('\n')
+    int_years = []
+    for y in years:
+        try:
+            int_years.append(int(y))
+        except ValueError:
+            pass
+
+    return int_years
 
 
-def check_for_new_excel():
+def check_for_new_excel(driver):
     """
     checks for new excel files to download, and if they aren't in the data folder,
     downloads them
     """
+    driver.get('http://shortsqueeze.com/ShortFiles.php')
+    years = get_years(driver)
 
 
 def download_new_excel():
@@ -156,6 +168,13 @@ def download_daily_data(driver):
         og_file = '/home/nate/Downloads/' + f
         if os.path.exists(og_file):
             os.rename(og_file, HOME_DIR + 'data/short_squeeze_daily/' + f)
+
+
+def daily_updater():
+    """
+    checks if any new files to download, if so, downloads them
+    """
+    pass
 
 
 def log_in(driver):
