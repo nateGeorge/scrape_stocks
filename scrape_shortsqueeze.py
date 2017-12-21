@@ -286,6 +286,9 @@ def daily_updater(driver):
 
         print('sleeping 1h...')
         time.sleep(3600)
+        # need to login again because it will have logged out by then
+        log_in(driver)
+        time.sleep(3)
 
 
 def log_in(driver):
