@@ -3,6 +3,8 @@
 *.csv.gz
 data/*
 
+short_squeeze_data.h5
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
