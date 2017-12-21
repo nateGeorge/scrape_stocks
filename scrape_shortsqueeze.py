@@ -4,7 +4,8 @@ import os
 import time
 import pytz
 import glob
-import shutil
+import calendar
+import datetime
 
 # installed
 import requests as req
@@ -21,6 +22,12 @@ import pandas_market_calendars as mcal
 import scrape_stockdata as ss
 from utils import get_home_dir
 
+# for headless browser mode with FF
+from pyvirtualdisplay import Display
+display = Display(visible=0, size=(800, 600))
+display.start()
+
+
 try:
     ua = UserAgent()
 except:
@@ -36,14 +43,6 @@ UNAME = os.environ.get('ss_uname')
 PWORD = os.environ.get('ss_pass')
 HOME_DIR = get_home_dir(repo_name='scrape_stocks')
 
-def scrape_stuff():
-    # abandoned function after using chrome multidownloader
-    for y in YEARS:
-        url = base_url.format(y)
-        res = req.get(url)
-        soup = bs(res.content, 'lxml')
-        soup.find_all({'class': 'hyper13'})
-
 
 def get_years(driver):
     """
@@ -58,7 +57,27 @@ def get_years(driver):
         except ValueError:
             pass
 
-    return int_years
+    return np.array(int_years)
+
+
+def parse_bimo_dates(filename, dates_df, rev_cal_dict):
+    """
+    gets date from release dates dataframe and filename
+    """
+    # get the date from the dates_df and filename
+    # old way of doing it which worked before the effed up filenames with an extra 0 in nov 2017...
+    # date = f.split('/')[-1][9:16]
+    date = filename.split('/')[-1].split('-')[0].split('.')[1]
+    year = date[:4]
+    month_num = int(date[-3:-1])
+    month = rev_cal_dict[month_num]
+    ab = date[-1].upper()
+    t_df = dates_df[year]
+    date = '-'.join([year,
+                    str(month_num).zfill(2),
+                    str(t_df[t_df[int(year)] == (month + ' ' + ab)]['NASDAQ®'].values[0]).zfill(2)])
+    date = pd.to_datetime(date, format='%Y-%m-%d')
+    return date
 
 
 def check_for_new_excel(driver):
@@ -68,12 +87,54 @@ def check_for_new_excel(driver):
     """
     driver.get('http://shortsqueeze.com/ShortFiles.php')
     years = get_years(driver)
+    # get currently downloaded files
+    dates_df = pd.read_excel(HOME_DIR + 'short_squeeze_release_dates.xlsx', None)
+    cal_dict = {v: k for k, v in enumerate(calendar.month_name)}
+    del cal_dict['']
+    rev_cal_dict = {v: k for k, v in cal_dict.items()}
 
+    bimonthly_files = glob.glob(HOME_DIR + 'data/short_squeeze.com/*.xlsx')
+    bimonthly_filenames = set([f.split('/')[-1] for f in bimonthly_files])
+    bimo_dates = [parse_bimo_dates(f, dates_df, rev_cal_dict) for f in bimonthly_files]
+    latest_date = max(bimo_dates).date()
+    latest_year = latest_date.year
+    check_years = years[years >= latest_year]
 
-def download_new_excel():
-    if check_for_new_excel():
-        # download file here
-        pass
+    files_to_dl = []
+    filenames = []
+    for y in check_years:
+        driver.get('http://shortsqueeze.com/' + str(y) + '.php')
+        links = driver.find_elements_by_partial_link_text('Download')
+        for l in links:
+            link = l.get_attribute('href')
+            if link == 'http://shortsqueeze.com/ShortFiles.php':
+                continue
+
+            filename = link.split('/')[-1]
+            if filename in bimonthly_filenames:
+                continue
+
+            files_to_dl.append(link)
+            filenames.append(filename)
+
+    if len(files_to_dl) == 0:
+        print('no new files to download')
+
+    # seems to hang on download, so this will make it continue
+    driver.set_page_load_timeout(4)
+    for l in files_to_dl:
+        try:
+            print('downloading', l)
+            driver.get(l) # saves to downloads folder
+        except TimeoutException:
+            pass
+
+    for f in filenames:
+        full_fn = '/home/nate/Downloads/' + f
+        print(full_fn)
+        if os.path.exists(full_fn):
+            os.rename(full_fn, HOME_DIR + 'data/short_squeeze.com/' + f)
+
 
 def setup_driver(backend='FF'):
     """
@@ -122,15 +183,19 @@ def setup_driver(backend='FF'):
     return driver
 
 
+def get_latest_daily_date():
+    # get latest date from daily scrapes
+    daily_files = glob.glob(HOME_DIR + 'data/short_squeeze_daily/*.csv')
+    daily_dates = [pd.to_datetime(f.split('/')[-1].split('.')[0]) for f in daily_files]
+    last_daily = max(daily_dates).date()
+    return last_daily
+
+
 def download_daily_data(driver):
     """
     checks which files already exist, then downloads remaining files to bring up to current
     """
-    # get latest date from daily scrapes
-    daily_files = glob.glob(HOME_DIR + 'data/short_squeeze_daily/*.csv')
-    daily_dates = [pd.to_datetime(f.split('/')[-1].split('.')[0]) for f in daily_files]
-    last_daily = max(daily_dates).date() # pytz.utc.localize(
-
+    last_daily = get_latest_daily_date()
     today_utc = pd.to_datetime('now')
     # was thinking about using NY time, but mcal is in UTC
     # local_tz = pytz.timezone('America/New_York')
@@ -149,8 +214,6 @@ def download_daily_data(driver):
 
     # seems to hang on download, so this will make it continue
     driver.set_page_load_timeout(4)
-
-    # TODO: set download directory somehow, or use another profile
     filenames = []
     for s in to_scrape:
         d = s.strftime('%Y-%m-%d')
@@ -170,11 +233,59 @@ def download_daily_data(driver):
             os.rename(og_file, HOME_DIR + 'data/short_squeeze_daily/' + f)
 
 
-def daily_updater():
+def check_market_status():
+    """
+    Checks to see if market is open today.
+    Uses the pandas_market_calendars package as mcal
+    """
+    # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
+    today_utc = pd.to_datetime('now').date()
+    ndq = mcal.get_calendar('NASDAQ')
+    open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_utc)
+    if today_utc in open_days.index:
+        return open_days
+    else:
+        return None
+
+
+def get_latest_close_date(market='NASDAQ'):
+    """
+    gets the latest date the markets were open (NASDAQ), and returns the closing datetime
+    """
+    # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
+    today_utc = pd.to_datetime('now').date()
+    ndq = mcal.get_calendar(market)
+    open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_utc)
+    return open_days.iloc[-1]['market_close']
+
+
+def daily_updater(driver):
     """
     checks if any new files to download, if so, downloads them
     """
-    pass
+    latest_scrape = get_latest_daily_date()
+    while True:
+        latest_close_date = get_latest_close_date()
+        today_utc = pd.to_datetime('now')
+        today_ny = datetime.datetime.now(pytz.timezone('America/New_York'))
+        pd_today_ny = pd.to_datetime(today_ny.date())
+        if (latest_close_date.date() - latest_scrape) > pd.Timedelta('1D'):
+            print('more than 1 day out of date, downloading...')
+            download_daily_data(driver)
+            check_for_new_excel(driver)
+        elif (latest_close_date.date() - latest_scrape) == pd.Timedelta('1D'):
+            if today_utc.hour > latest_close_date.hour:
+                print('market closed, checking for new data...')
+                download_daily_data(driver)
+                check_for_new_excel(driver)
+        elif pd_today_ny.date() == latest_close_date.date():  # if the market is open and the db isn't up to date with today...
+            if today_ny.hour >= 22:
+                print('downloading update from today...')
+                download_daily_data(driver)
+                check_for_new_excel(driver)
+
+        print('sleeping 1h...')
+        time.sleep(3600)
 
 
 def log_in(driver):
@@ -192,4 +303,5 @@ def log_in(driver):
 if __name__ == "__main__":
     driver = setup_driver()
     log_in(driver)
-    time.sleep(5)  # wait for login to complete...could also use some element detection
+    time.sleep(3)  # wait for login to complete...could also use some element detection
+    daily_updater(driver)
