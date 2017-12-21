@@ -23,6 +23,7 @@ import scrape_stockdata as ss
 from utils import get_home_dir
 
 # for headless browser mode with FF
+# http://scraping.pro/use-headless-firefox-scraping-linux/
 from pyvirtualdisplay import Display
 display = Display(visible=0, size=(800, 600))
 display.start()
