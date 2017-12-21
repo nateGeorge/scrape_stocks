@@ -5,6 +5,7 @@ import calendar
 
 # installed
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 
@@ -33,7 +34,7 @@ def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
     # drop the end junk, and the fully missing rows (usually 2 at the end)
     df = df.iloc[:end_idxs[0]]
     df.drop(df.index[df.isnull().all(1)], inplace=True)
-    df['Date'] = parse_bimo_dates(filename, dates_df, rev_cal_dict)
+    df['Date'] = parse_bimo_dates(f, dates_df, rev_cal_dict)
     if df['Symbol'].str.contains('AA-').sum() != 0 and verbose:
         print('contains AA-:', f)
 
@@ -89,15 +90,20 @@ def load_all_short_squeeze_data(verbose=False, debug=False):
     if latest_cache_date == latest_file_date:
         return cached_df
 
-
-    dfs = []
+    daily_files = np.array(daily_files)
+    daily_files_to_load = daily_files[np.array(daily_dates) > max(bimo_dates)]
 
     dfs = []
     if debug:
-        for f in bimonhtly_files:
+        for f in bimonthly_files:
             df = load_parse_excel(f, dates_df, rev_cal_dict, verbose)
             dfs.append(df)
+
+        for f in daily_files_to_load:
+            df = load_daily_csv(f)
+            dfs.append(df)
     else:
+        # load bimonthly data first
         jobs = []
         with ProcessPoolExecutor(max_workers=None) as executor:
             for f in bimonthly_files:
@@ -109,7 +115,17 @@ def load_all_short_squeeze_data(verbose=False, debug=False):
                 jobs.append((f, r))
 
         for f, r in jobs:
-            print(r)
+            if r.result() is not None:
+                dfs.append(r.result())
+
+        # load daily data
+        jobs = []
+        with ProcessPoolExecutor(max_workers=None) as executor:
+            for f in daily_files_to_load:
+                r = executor.submit(load_daily_csv, f, verbose)
+                jobs.append((f, r))
+
+        for f, r in jobs:
             if r.result() is not None:
                 dfs.append(r.result())
 
@@ -129,9 +145,9 @@ def load_all_short_squeeze_data(verbose=False, debug=False):
     return full_df
 
 
-def get_short_interest_data(full_df=None, debug=False):
+def get_short_interest_data(full_df=None, verbose=False, debug=False):
     if full_df is None:
-        full_df = load_all_short_squeeze_data(debug=debug)
+        full_df = load_all_short_squeeze_data(verbose=verbose, debug=debug)
 
     cols = ['Symbol',
             'Date',
@@ -163,3 +179,32 @@ def get_daily_files():
     gets list of daily files and return latest date
     """
     files = glob.glob(HOME_DIR + 'data/short_squeeze_daily/*.csv')
+
+
+def load_daily_csv(f, verbose=False):
+    if verbose:
+        print(f)
+
+    df = pd.read_csv(f)
+    # fixes truecar ticker error; is listed as '1' in the data
+    df.rename(columns={'Company': 'ShortSqueeze.com™ Short Interest Data'},
+                inplace=True)
+    tc_idx = df[df['ShortSqueeze.com™ Short Interest Data'] == 'Truecar Incorporated'].index[0]
+    df.at[tc_idx, 'Symbol'] = 'TRUE'
+    # df.set_value(tc_idx, 'Symbol', 'TRUE')  # old way of doing it
+    # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
+    # end_idxs = df.index[df.iloc[:, 0].str.contains('ShortSqueeze.com: Master Spreadsheet', case=False).fillna(False) | df.iloc[:, 0].str.contains('ShortSqueeze.comï¿½: Master Spreadsheetï¿½ ', case=False).fillna(False)]
+    end_idxs = df.index[df.iloc[:, 0].str.contains('Master Spreadsheet', case=False).fillna(False)]
+    if len(end_idxs) > 1:
+        print('WARNING: matched more than 1 end index at end of spreadsheet')
+    elif len(end_idxs) < 1:
+        print('WARNING: no end index found for:', f)
+
+    # drop the end junk, and the fully missing rows (usually 2 at the end)
+    df = df.iloc[:end_idxs[0]]
+    df.drop(df.index[df.isnull().all(1)], inplace=True)
+    df['Date'] = pd.to_datetime(f.split('/')[-1].split('.')[0])
+    if df['Symbol'].str.contains('AA-').sum() != 0 and verbose:
+        print('contains AA-:', f)
+
+    return df
