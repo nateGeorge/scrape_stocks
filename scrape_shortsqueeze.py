@@ -3,6 +3,8 @@
 import os
 import time
 import pytz
+import glob
+import shutil
 
 # installed
 import requests as req
@@ -17,6 +19,7 @@ import pandas_market_calendars as mcal
 
 # custom
 import scrape_stockdata as ss
+from utils import get_home_dir
 
 try:
     ua = UserAgent()
@@ -31,6 +34,7 @@ daily_url = 'http://shortsqueeze.com/down.php?fi={}.csv'  # date should be like 
 YEARS = ['2015', '2016', '2017']
 UNAME = os.environ.get('ss_uname')
 PWORD = os.environ.get('ss_pass')
+HOME_DIR = get_home_dir(repo_name='scrape_stocks')
 
 def scrape_stuff():
     # abandoned function after using chrome multidownloader
@@ -57,7 +61,7 @@ def check_for_new_excel():
 def download_new_excel():
     if check_for_new_excel():
         # download file here
-
+        pass
 
 def setup_driver(backend='FF'):
     """
@@ -79,8 +83,12 @@ def setup_driver(backend='FF'):
         # download once, check 'don't ask again' and 'save'
         # also change downloads folder to ticker_data within git repo
         # then file path to profile, and use here:
-        prof_path = '/home/nate/.mozilla/firefox/jdl7io1l.scr' # scr was the name of the profile
+        prof_path = '/home/nate/.mozilla/firefox/4mmudyyu.short_squeeze' # short_squeeze was the name of the profile
+        # saves to downloads folder by default
         profile = webdriver.FirefoxProfile(prof_path)
+        # auto-download unknown mime types:
+        # http://forums.mozillazine.org/viewtopic.php?f=38&t=2430485
+        profile.set_preference('browser.helperApps.neverAsk.saveToDisk', 'application/octet-stream')
         # https://www.lifewire.com/firefox-about-config-entry-browser-445707
         # profile.set_preference('browser.download.folderList', 1) # downloads folder
         # profile.set_preference('browser.download.manager.showWhenStarting', False)
@@ -102,10 +110,52 @@ def setup_driver(backend='FF'):
     return driver
 
 
-def download_daily_data():
+def download_daily_data(driver):
     """
     checks which files already exist, then downloads remaining files to bring up to current
     """
+    # get latest date from daily scrapes
+    daily_files = glob.glob(HOME_DIR + 'data/short_squeeze_daily/*.csv')
+    daily_dates = [pd.to_datetime(f.split('/')[-1].split('.')[0]) for f in daily_files]
+    last_daily = max(daily_dates).date() # pytz.utc.localize(
+
+    today_utc = pd.to_datetime('now')
+    # was thinking about using NY time, but mcal is in UTC
+    # local_tz = pytz.timezone('America/New_York')
+    # today_ny = today_utc.replace(tzinfo=pytz.utc).astimezone(local_tz)
+    ndq = mcal.get_calendar('NASDAQ')
+    open_days = ndq.schedule(start_date=today_utc - pd.Timedelta(str(3*365) + ' days'), end_date=today_utc)
+    # basically, this waits for 3 hours after market close if it's the same day
+    if open_days.iloc[-1]['market_close'].date() == today_utc.date():
+        open_days = open_days.iloc[:-1]
+
+    open_dates = np.array([o['market_close'].date() for l, o in open_days.iterrows()])
+    to_scrape = open_dates[open_dates > last_daily]
+    if len(to_scrape) == 0:
+        print('nothing to scrape right now')
+        return
+
+    # seems to hang on download, so this will make it continue
+    driver.set_page_load_timeout(4)
+
+    # TODO: set download directory somehow, or use another profile
+    filenames = []
+    for s in to_scrape:
+        d = s.strftime('%Y-%m-%d')
+        url = daily_url.format(d)
+        filename = url.split('=')[-1]  # gets csv filename right now
+        filenames.append(filename)
+        try:
+            print('downloading', filename)
+            driver.get(url) # saves to downloads folder
+        except TimeoutException:
+            pass
+
+    # moves file to data folder
+    for f in filenames:
+        og_file = '/home/nate/Downloads/' + f
+        if os.path.exists(og_file):
+            os.rename(og_file, HOME_DIR + 'data/short_squeeze_daily/' + f)
 
 
 def log_in(driver):
@@ -124,27 +174,3 @@ if __name__ == "__main__":
     driver = setup_driver()
     log_in(driver)
     time.sleep(5)  # wait for login to complete...could also use some element detection
-
-
-    # scrapes daily data
-    # TODO: put into function, also make daily checker function
-    # - check which files already exist, and start on the next date
-    today_utc = pd.to_datetime('now')
-    # was thinking about using NY time, but mcal is in UTC
-    # local_tz = pytz.timezone('America/New_York')
-    # today_ny = today_utc.replace(tzinfo=pytz.utc).astimezone(local_tz)
-    ndq = mcal.get_calendar('NASDAQ')
-    open_days = ndq.schedule(start_date=today_utc - pd.Timedelta(str(3*365) + ' days'), end_date=today_utc)
-    # basically, this waits for 3 hours after market close if it's the same day
-    if open_days.iloc[-1]['market_close'].date() == today_utc.date():
-        open_days = open_days.iloc[:-1]
-
-    driver.set_page_load_timeout(4)
-
-    for r in open_days.iloc[::-1].iterrows():
-        d = r[1]['market_close'].date().strftime('%Y-%m-%d')
-        url = daily_url.format(d)
-        try:
-            driver.get(url)
-        except TimeoutException:
-            pass
