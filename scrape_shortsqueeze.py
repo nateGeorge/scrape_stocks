@@ -288,24 +288,34 @@ def daily_updater(driver):
         print('sleeping 1h...')
         time.sleep(3600)
         # need to login again because it will have logged out by then
-        log_in(driver)
+        driver.Dispose()
+        driver = setup_driver()
+        driver = log_in(driver)
         time.sleep(3)
 
 
 def log_in(driver):
-    driver.get(login_url)
-    time.sleep(1 + np.random.rand())  # should add WebDriverWait
-    username = driver.find_element_by_xpath('/html/body/div/table[5]/tbody/tr/td/div/table/tbody/tr/td/form/table/tbody/tr[1]/td[2]/input')
-    password = driver.find_element_by_xpath('/html/body/div/table[5]/tbody/tr/td/div/table/tbody/tr/td/form/table/tbody/tr[2]/td[2]/input')
-    username.send_keys(UNAME)
-    password.send_keys(PWORD)
-    time.sleep(1 + np.random.rand())
-    signIn = driver.find_element_by_xpath('/html/body/div/table[5]/tbody/tr/td/div/table/tbody/tr/td/form/table/tbody/tr[3]/td[2]/input')
-    signIn.click()
+    while True:
+        try:
+            driver.get(login_url)
+            time.sleep(1 + np.random.rand())  # should add WebDriverWait
+            username = driver.find_element_by_xpath('/html/body/div/table[5]/tbody/tr/td/div/table/tbody/tr/td/form/table/tbody/tr[1]/td[2]/input')
+            password = driver.find_element_by_xpath('/html/body/div/table[5]/tbody/tr/td/div/table/tbody/tr/td/form/table/tbody/tr[2]/td[2]/input')
+            username.send_keys(UNAME)
+            password.send_keys(PWORD)
+            time.sleep(1 + np.random.rand())
+            signIn = driver.find_element_by_xpath('/html/body/div/table[5]/tbody/tr/td/div/table/tbody/tr/td/form/table/tbody/tr[3]/td[2]/input')
+            signIn.click()
+            return driver
+            break  # not sure if this necessary, but just in case
+        except TimeoutException:
+            driver.Dispose()
+            driver = setup_driver()
+
 
 
 if __name__ == "__main__":
     driver = setup_driver()
-    log_in(driver)
+    driver = log_in(driver)
     time.sleep(3)  # wait for login to complete...could also use some element detection
     daily_updater(driver)
