@@ -61,13 +61,16 @@ def parse_bimo_dates(filename, dates_df, rev_cal_dict):
     return date
 
 
-def load_all_short_squeeze_data(verbose=False, debug=False):
+def load_all_short_squeeze_data(verbose=False,
+                                debug=False,
+                                make_fresh=False,
+                                drop_cols=True):
     """
     loads all historical data
     :param load_cached: boolean, if true, will load an existing h5 file
     """
     filename = HOME_DIR + 'short_squeeze_data.h5'
-    if os.path.exists(filename):
+    if os.path.exists(filename) and not make_fresh:
         cached_df = pd.read_hdf(filename)
 
     cal_dict = {v: k for k, v in enumerate(calendar.month_name)}
@@ -130,18 +133,27 @@ def load_all_short_squeeze_data(verbose=False, debug=False):
                 dfs.append(r.result())
 
     full_df = pd.concat(dfs)
-    drop_cols = ['Record Date',
-                'Price',
-                'Exchange',
-                'Market Cap',
-                'ShortSqueeze.com™ Short Interest Data',
-                'Sector',
-                'Industry',
-                '(abs)',
-                '(abs).1',
-                '(abs).2',]
-    full_df.drop(drop_cols, inplace=True, axis=1)
+    if drop_cols:
+        cols_to_drop = ['Record Date',
+                        'Price',
+                        'Exchange',
+                        'Market Cap',
+                        'ShortSqueeze.com™ Short Interest Data',
+                        'Sector',
+                        'Industry',
+                        '(abs)',
+                        '(abs).1',
+                        '(abs).2',
+                        'Record_Date']
+
+        full_df.drop(cols_to_drop, inplace=True, axis=1)
+
+
+    # remove $ from market cap
+    full_df['Market_Cap'] = pd.to_numeric(full_df['Market_Cap'].str.replace('$', ''))
+    
     full_df.to_hdf(filename, key='data', complib='blosc', complevel=9)
+
     return full_df
 
 
