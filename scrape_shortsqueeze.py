@@ -288,7 +288,7 @@ def daily_updater(driver):
         print('sleeping 1h...')
         time.sleep(3600)
         # need to login again because it will have logged out by then
-        driver.Dispose()
+        driver.quit()
         driver = setup_driver()
         driver = log_in(driver)
         time.sleep(3)
@@ -309,7 +309,7 @@ def log_in(driver):
             return driver
             break  # not sure if this necessary, but just in case
         except TimeoutException:
-            driver.Dispose()
+            driver.quit()
             driver = setup_driver()
 
 
