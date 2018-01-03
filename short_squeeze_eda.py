@@ -1,4 +1,5 @@
 # core
+import re
 import os
 import glob
 import calendar
@@ -20,7 +21,10 @@ def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
 
     df = pd.read_excel(f)
     # fixes truecar ticker error; is listed as '1' in the data
-    tc_idx = df[df['ShortSqueeze.com™ Short Interest Data'] == 'Truecar Incorporated'].index[0]
+    # did some spreadsheets have 'Company' as the first column?
+    df.rename(columns={'ShortSqueeze.com™ Short Interest Data': 'Company'},
+                inplace=True)
+    tc_idx = df[df['Company'] == 'Truecar Incorporated'].index[0]
     df.at[tc_idx, 'Symbol'] = 'TRUE'
     # df.set_value(tc_idx, 'Symbol', 'TRUE')  # old way of doing it
     # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
@@ -37,6 +41,14 @@ def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
     df['Date'] = parse_bimo_dates(f, dates_df, rev_cal_dict)
     if df['Symbol'].str.contains('AA-').sum() != 0 and verbose:
         print('contains AA-:', f)
+
+    # rename columns so they have underscores intsead of spaces, to match the
+    # daily spreadsheets
+    for c in df.columns:
+        new_colname = re.sub('[:\s]+', '_', c)
+        new_colname = re.sub('_+', '_', new_colname)  # need to replace any double underscores
+        new_colname = re.sub('™', '', new_colname)  # remove tms from ranking, etc
+        df.rename(columns={c: new_colname}, inplace=True)
 
     return df
 
@@ -63,24 +75,23 @@ def parse_bimo_dates(filename, dates_df, rev_cal_dict):
 
 def load_all_short_squeeze_data(verbose=False,
                                 debug=False,
-                                make_fresh=False,
-                                drop_cols=True):
+                                make_fresh=False):
     """
     loads all historical data
     :param load_cached: boolean, if true, will load an existing h5 file
     """
     filename = HOME_DIR + 'short_squeeze_data.h5'
+    latest_cache_date = None
     if os.path.exists(filename) and not make_fresh:
         cached_df = pd.read_hdf(filename)
+        latest_cache_date = cached_df['Date'].max()
 
     cal_dict = {v: k for k, v in enumerate(calendar.month_name)}
     del cal_dict['']
     rev_cal_dict = {v: k for k, v in cal_dict.items()}
 
     dates_df = pd.read_excel(HOME_DIR + 'short_squeeze_release_dates.xlsx', None)
-
     # check if any files are newer than the latest date
-    latest_date = cached_df['Date'].max()
     bimonthly_files = glob.glob(HOME_DIR + 'data/short_squeeze.com/*.xlsx')
     bimo_dates = [parse_bimo_dates(f, dates_df, rev_cal_dict) for f in bimonthly_files]
 
@@ -89,7 +100,6 @@ def load_all_short_squeeze_data(verbose=False,
     daily_dates = [pd.to_datetime(f.split('/')[-1].split('.')[0]) for f in daily_files]
 
     latest_file_date = max(bimo_dates + daily_dates)
-    latest_cache_date = cached_df['Date'].max()
     if latest_cache_date == latest_file_date:
         return cached_df
 
@@ -133,45 +143,53 @@ def load_all_short_squeeze_data(verbose=False,
                 dfs.append(r.result())
 
     full_df = pd.concat(dfs)
-    if drop_cols:
-        cols_to_drop = ['Record Date',
-                        'Price',
-                        'Exchange',
-                        'Market Cap',
-                        'ShortSqueeze.com™ Short Interest Data',
-                        'Sector',
-                        'Industry',
-                        '(abs)',
-                        '(abs).1',
-                        '(abs).2',
-                        'Record_Date']
+    # always drop these columns
+    always_drop = ['(abs)',
+                   '(abs).1',
+                   '(abs).2',
+                   'Record_Date',
+                   'Exchange',
+                   'Company',
+                   'Sector',
+                   'Industry',
+                   'Price',
+                   'Market_Cap']
+    full_df.drop(always_drop, axis=1, inplace=True)
+    # removes $ from columns
+    # don't really need price or mkt cap though, because have it from quandl
+    # full_df['Price'] = pd.to_numeric(full_df['Price'].str.replace('$', ''))
+    # full_df['Market_Cap'] = pd.to_numeric(full_df['Market_Cap'].str.replace('$', ''))
 
-        full_df.drop(cols_to_drop, inplace=True, axis=1)
-
-
-    # remove $ from market cap
-    full_df['Market_Cap'] = pd.to_numeric(full_df['Market_Cap'].str.replace('$', ''))
-    
     full_df.to_hdf(filename, key='data', complib='blosc', complevel=9)
 
     return full_df
 
 
-def get_short_interest_data(full_df=None, verbose=False, debug=False):
+def get_short_interest_data(full_df=None,
+                            verbose=False,
+                            debug=False,
+                            all_cols=False,
+                            make_fresh=False):
     if full_df is None:
-        full_df = load_all_short_squeeze_data(verbose=verbose, debug=debug)
+        full_df = load_all_short_squeeze_data(verbose=verbose,
+                                                debug=debug,
+                                                make_fresh=make_fresh)
 
-    cols = ['Symbol',
-            'Date',
-            'Total Short Interest',
-            'Days to Cover',
-            'Short % of Float',
-            '% Insider Ownership',
-            '% Institutional Ownership',
-            'Shares: Float',
-            'Short Squeeze Ranking™']
+    if not all_cols:
+        cols = ['Symbol',
+                'Date',
+                'Total_Short_Interest',
+                'Days_to_Cover',
+                'Short_%_of_Float',
+                '%_Insider_Ownership',
+                '%_Institutional_Ownership',
+                'Shares_Float',
+                'Short_Squeeze_Ranking™']
 
-    return full_df[cols].rename(columns={'Short Squeeze Ranking™': 'Short Squeeze Ranking'})
+        return full_df[cols]
+
+    else:
+        return full_df
 
 
 def get_stocks(ignore_plus_minus=True):
@@ -199,9 +217,10 @@ def load_daily_csv(f, verbose=False):
 
     df = pd.read_csv(f)
     # fixes truecar ticker error; is listed as '1' in the data
-    df.rename(columns={'Company': 'ShortSqueeze.com™ Short Interest Data'},
+    # did some spreadsheets have 'Company' as the first column?
+    df.rename(columns={'ShortSqueeze.com™ Short Interest Data': 'Company'},
                 inplace=True)
-    tc_idx = df[df['ShortSqueeze.com™ Short Interest Data'] == 'Truecar Incorporated'].index[0]
+    tc_idx = df[df['Company'] == 'Truecar Incorporated'].index[0]
     df.at[tc_idx, 'Symbol'] = 'TRUE'
     # df.set_value(tc_idx, 'Symbol', 'TRUE')  # old way of doing it
     # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
@@ -218,5 +237,13 @@ def load_daily_csv(f, verbose=False):
     df['Date'] = pd.to_datetime(f.split('/')[-1].split('.')[0])
     if df['Symbol'].str.contains('AA-').sum() != 0 and verbose:
         print('contains AA-:', f)
+
+    # rename columns so they have underscores intsead of colons, to match the
+    # bimonhtly spreadsheets
+    for c in df.columns:
+        new_colname = re.sub('[:\s]+', '_', c)
+        new_colname = re.sub('_+', '_', new_colname)  # need to replace any double underscores
+        new_colname = re.sub('™', '', new_colname)  # remove tms from ranking, etc
+        df.rename(columns={c: new_colname}, inplace=True)
 
     return df
