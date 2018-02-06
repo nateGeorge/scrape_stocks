@@ -16,7 +16,7 @@ from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from fake_useragent import UserAgent
 import requests as req
-from requests.exceptions import Timeout
+from requests.exceptions import Timeout, SSLError
 from OpenSSL.SSL import WantReadError
 from bs4 import BeautifulSoup as bs
 from lxml import html
@@ -456,12 +456,17 @@ def scrape_all_tickers(tickers):
     for t in tqdm(tickers):
         print(t)
         url = base_yahoo_query_url.format(t)
+        tries = 0
         while True:
             try:
+                tries += 1
                 res = req.get(url, timeout=10)
                 break
-            except (Timeout, WantReadError):
+            except (Timeout, WantReadError, SSLError):
                 time.sleep(2)
+                if tries == 5:
+                    break
+
                 continue
 
         if res.json()['quoteSummary']['result'] is None and res.json()['quoteSummary']['error']['code'] == 'Not Found':
@@ -548,7 +553,7 @@ def scrape_all_tickers_mongo_parallel(tickers=None):
     for t, r in jobs:
         if r is None:
             print('ticker:', t, 'job result is None')
-        elif r.result() is not None:
+        elif r is not None and r.result() is not None:
             print('ticker:', t, 'result:', r.result())
     # old way of doing it, and wasn't working great
     # for ti in tiks:
@@ -575,7 +580,7 @@ def scrape_a_ticker_mongo(base_yahoo_query_url, t, data_date):
                 continue
 
             break
-        except (Timeout, WantReadError):
+        except (Timeout, WantReadError, ConnectionError):
             time.sleep(delay)
             delay = delay * 2
             continue
