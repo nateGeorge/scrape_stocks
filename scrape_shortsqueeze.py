@@ -1,3 +1,5 @@
+# TODO: dynamically update HOME_DIR + 'short_squeeze_release_dates.xlsx'
+
 # would need to use selenium to get this to work...meh, just use a multidownloader for chrome
 # core
 import os
