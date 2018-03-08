@@ -15,15 +15,17 @@ from utils import get_home_dir
 
 HOME_DIR = get_home_dir(repo_name='scrape_stocks')
 
-def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
-    if verbose:
-        print(f)
 
-    df = pd.read_excel(f)
+def fix_truecar_problem(df, f, verbose=False):
     # fixes truecar ticker error; is listed as '1' in the data
     # did some spreadsheets have 'Company' as the first column?
-    df.rename(columns={'ShortSqueeze.com™ Short Interest Data': 'Company'},
-                inplace=True)
+    if 'ShortSqueeze.com Short Interest Data' in df.columns:
+        df.rename(columns={'ShortSqueeze.com Short Interest Data': 'Company'},
+                    inplace=True)
+    else:
+        df.rename(columns={'ShortSqueeze.com™ Short Interest Data': 'Company'},
+                    inplace=True)
+
     tc_idx = df[df['Company'] == 'Truecar Incorporated']
     if tc_idx.shape[0] == 0:
         if verbose:
@@ -31,11 +33,22 @@ def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
         tc_idx = df[df['Company'] == 'Truecar Inc']
         if tc_idx.shape[0] == 0:
             print('"Truecar Inc not found...error"')
+            print('you probably want to re-download', f)
+            return
 
     tc_idx = tc_idx.index[0]
 
     df.at[tc_idx, 'Symbol'] = 'TRUE'
     # df.set_value(tc_idx, 'Symbol', 'TRUE')  # old way of doing it
+
+
+def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
+    if verbose:
+        print(f)
+
+    df = pd.read_excel(f)
+    fix_truecar_problem(df, f, verbose=verbose)
+
     # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
     # end_idxs = df.index[df.iloc[:, 0].str.contains('ShortSqueeze.com: Master Spreadsheet', case=False).fillna(False) | df.iloc[:, 0].str.contains('ShortSqueeze.comï¿½: Master Spreadsheetï¿½ ', case=False).fillna(False)]
     end_idxs = df.index[df.iloc[:, 0].str.contains('Master Spreadsheet', case=False).fillna(False)]
@@ -225,13 +238,8 @@ def load_daily_csv(f, verbose=False):
         print(f)
 
     df = pd.read_csv(f)
-    # fixes truecar ticker error; is listed as '1' in the data
-    # did some spreadsheets have 'Company' as the first column?
-    df.rename(columns={'ShortSqueeze.com™ Short Interest Data': 'Company'},
-                inplace=True)
-    tc_idx = df[df['Company'] == 'Truecar Incorporated'].index[0]
-    df.at[tc_idx, 'Symbol'] = 'TRUE'
-    # df.set_value(tc_idx, 'Symbol', 'TRUE')  # old way of doing it
+    fix_truecar_problem(df, verbose=verbose)
+
     # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
     # end_idxs = df.index[df.iloc[:, 0].str.contains('ShortSqueeze.com: Master Spreadsheet', case=False).fillna(False) | df.iloc[:, 0].str.contains('ShortSqueeze.comï¿½: Master Spreadsheetï¿½ ', case=False).fillna(False)]
     end_idxs = df.index[df.iloc[:, 0].str.contains('Master Spreadsheet', case=False).fillna(False)]
