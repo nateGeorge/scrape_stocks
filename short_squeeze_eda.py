@@ -24,7 +24,16 @@ def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
     # did some spreadsheets have 'Company' as the first column?
     df.rename(columns={'ShortSqueeze.com™ Short Interest Data': 'Company'},
                 inplace=True)
-    tc_idx = df[df['Company'] == 'Truecar Incorporated'].index[0]
+    tc_idx = df[df['Company'] == 'Truecar Incorporated']
+    if tc_idx.shape[0] == 0:
+        if verbose:
+            print('"Truecar Incorporated" not found in company names, trying "Truecar Inc"')
+        tc_idx = df[df['Company'] == 'Truecar Inc']
+        if tc_idx.shape[0] == 0:
+            print('"Truecar Inc not found...error"')
+
+    tc_idx = tc_idx.index[0]
+
     df.at[tc_idx, 'Symbol'] = 'TRUE'
     # df.set_value(tc_idx, 'Symbol', 'TRUE')  # old way of doing it
     # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
