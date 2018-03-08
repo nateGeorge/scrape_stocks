@@ -239,6 +239,7 @@ def daily_scrape_data():
 
 if __name__ == "__main__":
     update_data(check_all_months=True)
+    daily_scrape_data()
     # uls, month_links = get_idx()
     # dfs = {}
     # for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
