@@ -492,7 +492,11 @@ def scrape_all_tickers(tickers):
     return full_df
 
 
-def scrape_all_tickers_mongo_linear(tickers):
+def scrape_all_tickers_mongo_linear(tickers=None):
+    if tickers is None:
+        tickers = get_stock_list(scrape=False)
+        tickers = get_yahoo_tickers(tickers)
+
     base_yahoo_query_url = 'https://query2.finance.yahoo.com/v11/finance/quoteSummary/{}?modules=defaultKeyStatistics,assetProfile,financialData,calendarEvents,incomeStatementHistory,cashflowStatementHistory,balanceSheetHistory'
 
     for t in tqdm(tickers):
@@ -508,6 +512,10 @@ def scrape_all_tickers_mongo_linear(tickers):
 
         if res.json()['quoteSummary']['result'] is None and res.json()['quoteSummary']['error']['code'] == 'Not Found':
             print('ticker not found')
+            continue
+        elif res.json()['quoteSummary']['result'] is None:
+            print('error for ticker', t, ':')
+            print(res.json()['quoteSummary']['error'])
             continue
         else:
             dfs = []
@@ -587,6 +595,10 @@ def scrape_a_ticker_mongo(base_yahoo_query_url, t, data_date):
 
     if res.json()['quoteSummary']['result'] is None and res.json()['quoteSummary']['error']['code'] == 'Not Found':
         print('ticker not found')
+        return
+    elif res.json()['quoteSummary']['result'] is None:
+        print('error for ticker', t, ':')
+        print(res.json()['quoteSummary']['error'])
         return
     else:
         client = MongoClient()
