@@ -214,11 +214,11 @@ def get_short_interest_data(full_df=None,
         return full_df
 
 
-def get_stocks(ignore_plus_minus=True):
+def get_stocks(verbose=False, debug=False, ignore_plus_minus=True):
     """
     returns stocks with data from shortsqueeze.com
     """
-    full_df = load_all_short_squeeze_data()
+    full_df = load_all_short_squeeze_data(debug=debug, verbose=verbose)
     stks = sorted(full_df['Symbol'].unique())
     if ignore_plus_minus:
         stks = [s for s in stks if s[-1] not in ['+', '-']]
@@ -238,7 +238,7 @@ def load_daily_csv(f, verbose=False):
         print(f)
 
     df = pd.read_csv(f)
-    fix_truecar_problem(df, verbose=verbose)
+    fix_truecar_problem(df, f, verbose=verbose)
 
     # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
     # end_idxs = df.index[df.iloc[:, 0].str.contains('ShortSqueeze.com: Master Spreadsheet', case=False).fillna(False) | df.iloc[:, 0].str.contains('ShortSqueeze.comï¿½: Master Spreadsheetï¿½ ', case=False).fillna(False)]

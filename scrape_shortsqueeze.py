@@ -198,6 +198,8 @@ def download_daily_data(driver):
     """
     checks which files already exist, then downloads remaining files to bring up to current
     """
+    # TODO: check which files are missing or are size 0 in the existing files after the latest
+    # excel file, and download those.  delete/archive any files older than the last excel file
     last_daily = get_latest_daily_date()
     today_utc = pd.to_datetime('now')
     # was thinking about using NY time, but mcal is in UTC
