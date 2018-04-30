@@ -11,12 +11,13 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 
 # custom
+import scrape_shortsqueeze as ss
 from utils import get_home_dir
 
 HOME_DIR = get_home_dir(repo_name='scrape_stocks')
 
 
-def fix_truecar_problem(df, f, verbose=False):
+def fix_truecar_problem(df, f, verbose=False, second_try=False):
     # fixes truecar ticker error; is listed as '1' in the data
     # did some spreadsheets have 'Company' as the first column?
     if 'ShortSqueeze.com Short Interest Data' in df.columns:
@@ -32,14 +33,29 @@ def fix_truecar_problem(df, f, verbose=False):
             print('"Truecar Incorporated" not found in company names, trying "Truecar Inc"')
         tc_idx = df[df['Company'] == 'Truecar Inc']
         if tc_idx.shape[0] == 0:
+            print('\n' * 10)
             print('"Truecar Inc not found...error"')
-            print('you probably want to re-download', f)
-            return
+            print('re-downloading data for', f, '...')
+            if not second_try:
+                ss.download_daily_data(date=f.split('/')[-1].split('.')[0])
+                return False
+
+            # usually if this problem is here, there will be a problem at:
+            #     251     # drop the end junk, and the fully missing rows (usually 2 at the end)
+            # --> 252     df = df.iloc[:end_idxs[0]]
+            #     253     df.drop(df.index[df.isnull().all(1)], inplace=True)
+            #     254     df['Date'] = pd.to_datetime(f.split('/')[-1].split('.')[0])
+
+            print('you may want to examine', f)
+            return True
+
+
 
     tc_idx = tc_idx.index[0]
 
     df.at[tc_idx, 'Symbol'] = 'TRUE'
     # df.set_value(tc_idx, 'Symbol', 'TRUE')  # old way of doing it
+    return True
 
 
 def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
@@ -47,7 +63,10 @@ def load_parse_excel(f, dates_df, rev_cal_dict, verbose=False):
         print(f)
 
     df = pd.read_excel(f)
-    fix_truecar_problem(df, f, verbose=verbose)
+    fixed = fix_truecar_problem(df, f, verbose=verbose)
+    if not fixed:
+        df = pd.read_excel(f)
+        fixed = fix_truecar_problem(df, f, verbose=verbose, second_try=True)
 
     # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
     # end_idxs = df.index[df.iloc[:, 0].str.contains('ShortSqueeze.com: Master Spreadsheet', case=False).fillna(False) | df.iloc[:, 0].str.contains('ShortSqueeze.comï¿½: Master Spreadsheetï¿½ ', case=False).fillna(False)]
@@ -238,7 +257,10 @@ def load_daily_csv(f, verbose=False):
         print(f)
 
     df = pd.read_csv(f)
-    fix_truecar_problem(df, f, verbose=verbose)
+    fixed = fix_truecar_problem(df, f, verbose=verbose)
+    if not fixed:
+        df = pd.read_csv(f)
+        fixed = fix_truecar_problem(df, f, verbose=verbose, second_try=True)
 
     # cuts off crap at the end -- old way of doing it was too verbose, so commentetd out
     # end_idxs = df.index[df.iloc[:, 0].str.contains('ShortSqueeze.com: Master Spreadsheet', case=False).fillna(False) | df.iloc[:, 0].str.contains('ShortSqueeze.comï¿½: Master Spreadsheetï¿½ ', case=False).fillna(False)]

@@ -194,10 +194,17 @@ def get_latest_daily_date():
     return last_daily
 
 
-def download_daily_data(driver):
+def download_daily_data(driver=None, date=None):
     """
     checks which files already exist, then downloads remaining files to bring up to current
+
+    or if 'date' supplied (i.e. 2018-04-12, yyyy-mm-dd, as a string), then downloads for that specific date
     """
+    if driver is None:
+        driver = setup_driver()
+        driver = log_in(driver)
+        time.sleep(3)  # wait for login to complete...could also use some element detection
+
     # TODO: check which files are missing or are size 0 in the existing files after the latest
     # excel file, and download those.  delete/archive any files older than the last excel file
     last_daily = get_latest_daily_date()
@@ -212,10 +219,18 @@ def download_daily_data(driver):
         open_days = open_days.iloc[:-1]
 
     open_dates = np.array([o['market_close'].date() for l, o in open_days.iterrows()])
-    to_scrape = open_dates[open_dates > last_daily]
-    if len(to_scrape) == 0:
-        print('nothing to scrape right now')
-        return
+    if date is None:
+        to_scrape = open_dates[open_dates > last_daily]
+        if len(to_scrape) == 0:
+            print('nothing to scrape right now')
+            return
+    else:
+        date_strptime = datetime.datetime.strptime(date, '%Y-%m-%d').date()
+        if date_strptime not in open_dates:
+            print('supplied date of', date, 'is not in the open_dates, doing nothing...')
+            return
+        else:
+            to_scrape = [date_strptime]
 
     # seems to hang on download, so this will make it continue
     driver.set_page_load_timeout(4)
