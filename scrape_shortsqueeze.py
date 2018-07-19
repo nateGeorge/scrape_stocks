@@ -164,7 +164,9 @@ def setup_driver(backend='FF'):
         profile = webdriver.FirefoxProfile(prof_path)
         # auto-download unknown mime types:
         # http://forums.mozillazine.org/viewtopic.php?f=38&t=2430485
-        profile.set_preference('browser.helperApps.neverAsk.saveToDisk', 'application/octet-stream')
+        # set to text/csv and comma-separated any other file types
+        # https://stackoverflow.com/a/9329022/4549682
+        profile.set_preference('browser.helperApps.neverAsk.saveToDisk', 'text/csv')
         # https://www.lifewire.com/firefox-about-config-entry-browser-445707
         # profile.set_preference('browser.download.folderList', 1) # downloads folder
         # profile.set_preference('browser.download.manager.showWhenStarting', False)
