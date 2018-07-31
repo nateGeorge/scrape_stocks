@@ -14,7 +14,7 @@ import requests as req
 from bs4 import BeautifulSoup as bs
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from fake_useragent import UserAgent
 import numpy as np
 import pandas as pd
@@ -23,13 +23,6 @@ import pandas_market_calendars as mcal
 # custom
 import scrape_stockdata as ss
 from utils import get_home_dir
-
-# for headless browser mode with FF
-# http://scraping.pro/use-headless-firefox-scraping-linux/
-from pyvirtualdisplay import Display
-display = Display(visible=0, size=(800, 600))
-display.start()
-
 
 try:
     ua = UserAgent()
@@ -309,7 +302,12 @@ def daily_updater(driver):
         # need to login again because it will have logged out by then
         driver.quit()
         driver = setup_driver()
-        driver = log_in(driver)
+        try:
+            driver = log_in(driver)
+        except NoSuchElementException:
+            driver.quit()
+            driver = setup_driver()
+            driver = log_in(driver)
         time.sleep(3)
 
 
@@ -334,6 +332,12 @@ def log_in(driver):
 
 
 if __name__ == "__main__":
+    # for headless browser mode with FF
+    # http://scraping.pro/use-headless-firefox-scraping-linux/
+    from pyvirtualdisplay import Display
+    display = Display(visible=0, size=(800, 600))
+    display.start()
+
     driver = setup_driver()
     driver = log_in(driver)
     time.sleep(3)  # wait for login to complete...could also use some element detection
