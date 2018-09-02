@@ -331,9 +331,10 @@ def log_in(driver):
             time.sleep(1 + np.random.rand())
             signIn = driver.find_element_by_xpath('/html/body/div/table[5]/tbody/tr/td/div/table/tbody/tr/td/form/table/tbody/tr[3]/td[2]/input')
             signIn.click()
+            print('logged in successfully')
             return driver
-            break  # not sure if this necessary, but just in case
-        except TimeoutException:
+            break  # not sure if this necessary, but[] just in case
+        except (TimeoutException, NoSuchElementException):
             driver.quit()
             driver = setup_driver()
 
