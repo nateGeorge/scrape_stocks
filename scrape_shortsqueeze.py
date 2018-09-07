@@ -37,7 +37,8 @@ daily_url = 'http://shortsqueeze.com/down.php?fi={}.csv'  # date should be like 
 YEARS = ['2015', '2016', '2017']
 UNAME = os.environ.get('ss_uname')
 PWORD = os.environ.get('ss_pass')
-HOME_DIR = get_home_dir(repo_name='scrape_stocks')
+# HOME_DIR = get_home_dir(repo_name='scrape_stocks')
+HOME_DIR = '/home/nate/Dropbox/data/shortsqueeze/'
 
 
 def get_years(driver):
@@ -84,12 +85,12 @@ def check_for_new_excel(driver):
     driver.get('http://shortsqueeze.com/ShortFiles.php')
     years = get_years(driver)
     # get currently downloaded files
-    dates_df = pd.read_excel(HOME_DIR + 'short_squeeze_release_dates.xlsx', None)
+    dates_df = pd.read_excel(get_home_dir(repo_name='scrape_stocks') + 'short_squeeze_release_dates.xlsx', None)
     cal_dict = {v: k for k, v in enumerate(calendar.month_name)}
     del cal_dict['']
     rev_cal_dict = {v: k for k, v in cal_dict.items()}
 
-    bimonthly_files = glob.glob(HOME_DIR + 'data/short_squeeze.com/*.xlsx')
+    bimonthly_files = glob.glob(HOME_DIR + 'short_squeeze.com/*.xlsx')
     bimonthly_filenames = set([f.split('/')[-1] for f in bimonthly_files])
     bimo_dates = [parse_bimo_dates(f, dates_df, rev_cal_dict) for f in bimonthly_files]
     latest_date = max(bimo_dates).date()
@@ -129,7 +130,7 @@ def check_for_new_excel(driver):
         full_fn = '/home/nate/Downloads/' + f
         print(full_fn)
         if os.path.exists(full_fn):
-            os.rename(full_fn, HOME_DIR + 'data/short_squeeze.com/' + f)
+            os.rename(full_fn, HOME_DIR + 'short_squeeze.com/' + f)
 
 
 def setup_driver(backend='FF'):
@@ -189,7 +190,7 @@ def setup_driver(backend='FF'):
 
 def get_latest_daily_date():
     # get latest date from daily scrapes
-    daily_files = glob.glob(HOME_DIR + 'data/short_squeeze_daily/*.csv')
+    daily_files = glob.glob(HOME_DIR + 'short_squeeze_daily/*.csv')
     daily_dates = [pd.to_datetime(f.split('/')[-1].split('.')[0]) for f in daily_files]
     last_daily = max(daily_dates).date()
     return last_daily
@@ -251,7 +252,7 @@ def download_daily_data(driver=None, date=None):
     for f in filenames:
         og_file = '/home/nate/Downloads/' + f
         if os.path.exists(og_file):
-            os.rename(og_file, HOME_DIR + 'data/short_squeeze_daily/' + f)
+            os.rename(og_file, HOME_DIR + 'short_squeeze_daily/' + f)
 
 
 def check_market_status():
