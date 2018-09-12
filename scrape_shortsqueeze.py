@@ -281,7 +281,7 @@ def get_latest_close_date(market='NASDAQ'):
     return open_days.iloc[-1]['market_close']
 
 
-def daily_updater(driver):
+def daily_updater():
     """
     checks if any new files to download, if so, downloads them
     """
@@ -293,31 +293,40 @@ def daily_updater(driver):
         pd_today_ny = pd.to_datetime(today_ny.date())
         if (latest_close_date.date() - latest_scrape) > pd.Timedelta('1D'):
             print('more than 1 day out of date, downloading...')
+            driver = setup_driver()
+            driver = log_in(driver)
+            time.sleep(3)  # wait for login to complete...could also use some element detection
             download_daily_data(driver)
             check_for_new_excel(driver)
+            driver.quit()
         elif (latest_close_date.date() - latest_scrape) == pd.Timedelta('1D'):
             if today_utc.hour > latest_close_date.hour:
                 print('market closed, checking for new data...')
+                driver = setup_driver()
+                driver = log_in(driver)
+                time.sleep(3)  # wait for login to complete...could also use some element detection
                 download_daily_data(driver)
                 check_for_new_excel(driver)
+                driver.quit()
         elif pd_today_ny.date() == latest_close_date.date():  # if the market is open and the db isn't up to date with today...
             if today_ny.hour >= 22:
                 print('downloading update from today...')
+                driver = setup_driver()
+                driver = log_in(driver)
+                time.sleep(3)  # wait for login to complete...could also use some element detection
                 download_daily_data(driver)
                 check_for_new_excel(driver)
+                driver.quit()
 
         print('sleeping 1h...')
         time.sleep(3600)
-        # need to login again because it will have logged out by then
-        driver.quit()
-        driver = setup_driver()
-        try:
-            driver = log_in(driver)
-        except NoSuchElementException:
-            driver.quit()
-            driver = setup_driver()
-            driver = log_in(driver)
-        time.sleep(3)
+        # try:
+        #     driver = log_in(driver)
+        # except NoSuchElementException:
+        #     driver.quit()
+        #     driver = setup_driver()
+        #     driver = log_in(driver)
+        # time.sleep(3)
 
 
 def log_in(driver):
@@ -348,7 +357,4 @@ if __name__ == "__main__":
     display = Display(visible=0, size=(800, 600))
     display.start()
 
-    driver = setup_driver()
-    driver = log_in(driver)
-    time.sleep(3)  # wait for login to complete...could also use some element detection
-    daily_updater(driver)
+    daily_updater()
