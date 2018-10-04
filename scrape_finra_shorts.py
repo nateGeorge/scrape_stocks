@@ -76,6 +76,11 @@ def get_lists(url, verbose=False):
 
 
 def get_idx(verbose=False):
+    """
+    gets unordered lists ('uls') which contain links to data files for short interest volume data
+
+    also gets links to historical data by month
+    """
     url = 'http://regsho.finra.org/regsho-Index.html'
     res = req.get(url, timeout=20)
     soup = bs(res.content, 'lxml')
@@ -92,7 +97,8 @@ def get_idx(verbose=False):
 
     if len(uls) == 0:
         # then we skipped all the lists because it's early in the month
-        uls = lists[1:5]
+        # TODO: dynamically detect if new list is added somehow
+        uls = lists[1:6]  # they added a list, so now it's 5 lists
 
     tables = soup.find_all('table')
     month_links = [t.attrs['href'] for t in tables[1].find_all('a')]
@@ -121,7 +127,7 @@ def get_filenames(links):
 
 
 def get_org(filename):
-    lookup_dict = {'FORF': 'ORF', 'FNYX': 'NYSE', 'FNRA': 'ADF', 'FNSQ': 'NASDAQ'}
+    lookup_dict = {'FORF': 'ORF', 'FNYX': 'NYSE', 'FNRA': 'ADF', 'FNSQ': 'NASDAQ', 'FNQC': 'NASDAQ-Chicago'}
     return lookup_dict[filename[:4]]
 
 
@@ -134,6 +140,7 @@ def update_data(check_all_months=True, verbose=False):
     uls, month_links = get_idx(verbose=verbose)
 
     links = []
+    # don't need the o, not sure why it's there
     for u, o in zip(uls, ['ADF', 'NASDAQ', 'NYSE', 'ORF']):
         for l in u.find_all('li'):
             links.append(l.find('a').attrs['href'])
@@ -152,9 +159,13 @@ def update_data(check_all_months=True, verbose=False):
     print('missing', len(missing_files), 'files')
 
     for f in missing_files:
+        print(f)
         link = fn_dict[f]
         org = get_org(f)
-        urllib.request.urlretrieve(link, 'data/' + org + '/' + f)
+        datadir = 'data/' + org + '/'
+        if not os.path.exists(datadir):
+            os.mkdir(datadir)
+        urllib.request.urlretrieve(link, datadir + f)
 
 
 def read_file_to_df(f, verbose):
