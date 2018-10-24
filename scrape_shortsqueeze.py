@@ -8,6 +8,7 @@ import pytz
 import glob
 import calendar
 import datetime
+import traceback
 
 # installed
 import requests as req
@@ -293,30 +294,15 @@ def daily_updater():
         pd_today_ny = pd.to_datetime(today_ny.date())
         if (latest_close_date.date() - latest_scrape) > pd.Timedelta('1D'):
             print('more than 1 day out of date, downloading...')
-            driver = setup_driver()
-            driver = log_in(driver)
-            time.sleep(3)  # wait for login to complete...could also use some element detection
-            download_daily_data(driver)
-            check_for_new_excel(driver)
-            driver.quit()
+            download_updates()
         elif (latest_close_date.date() - latest_scrape) == pd.Timedelta('1D'):
             if today_utc.hour > latest_close_date.hour:
                 print('market closed, checking for new data...')
-                driver = setup_driver()
-                driver = log_in(driver)
-                time.sleep(3)  # wait for login to complete...could also use some element detection
-                download_daily_data(driver)
-                check_for_new_excel(driver)
-                driver.quit()
+                download_updates()
         elif pd_today_ny.date() == latest_close_date.date():  # if the market is open and the db isn't up to date with today...
             if today_ny.hour >= 22:
                 print('downloading update from today...')
-                driver = setup_driver()
-                driver = log_in(driver)
-                time.sleep(3)  # wait for login to complete...could also use some element detection
-                download_daily_data(driver)
-                check_for_new_excel(driver)
-                driver.quit()
+                download_updates()
 
         print('sleeping 1h...')
         time.sleep(3600)
@@ -348,6 +334,23 @@ def log_in(driver):
             driver.quit()
             driver = setup_driver()
 
+
+def download_updates():
+    """
+    checks for daily and bimonthly updates, then downloads if needed
+    """
+    while True:
+        try:
+            driver = setup_driver()
+            driver = log_in(driver)
+            time.sleep(3)  # wait for login to complete...could also use some element detection
+            download_daily_data(driver)
+            check_for_new_excel(driver)
+            driver.quit()
+            break
+        except:
+            traceback.print_exc()
+            time.sleep(5)
 
 
 if __name__ == "__main__":
