@@ -171,4 +171,4 @@ def short_squeeze_analysis(all_sh_stocks_df, ticker='TDOC'):
 all_sh_stocks_df, all_sh_stocks_full_df, latest_stocks_df, sh_int = load_stocks_calculate_short_corr()
 ticker_groups, larger_shorts, short_stocks = make_larger_shorts(all_sh_stocks_df)
 
-short_squeeze_analysis(all_sh_stocks_df, ticker='TLRY')
+short_squeeze_analysis(all_sh_stocks_full_df, ticker='TLRY')
