@@ -33,6 +33,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 
 try:
+    # fix: https://github.com/instabot-py/instabot.py/issues/1642#issuecomment-430186348
     ua = UserAgent(verify_ssl=False, use_cache_server=False)
     # ua = UserAgent()
 except:
