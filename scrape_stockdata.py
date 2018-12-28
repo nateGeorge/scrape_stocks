@@ -33,10 +33,12 @@ from concurrent.futures import ProcessPoolExecutor
 
 
 try:
-    ua = UserAgent()
+    ua = UserAgent(verify_ssl=False, use_cache_server=False)
+    # ua = UserAgent()
 except:
     print("Couldn't make user agent, trying again")
-    ua = UserAgent()
+    # ua = UserAgent()
+    ua = UserAgent(verify_ssl=False, use_cache_server=False)
 
 
 BASE_URL = 'http://www.nasdaq.com/'
