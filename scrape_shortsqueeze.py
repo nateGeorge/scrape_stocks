@@ -287,7 +287,7 @@ def check_market_status():
     # today_utc = pd.to_datetime('now').date()
     today_ny = datetime.datetime.now(pytz.timezone('America/New_York'))
     ndq = mcal.get_calendar('NASDAQ')
-    open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_ny)
+    open_days = ndq.schedule(start_date=today_ny - pd.Timedelta('10 days'), end_date=today_ny)
     if today_ny in open_days.index:
         return open_days
     else:

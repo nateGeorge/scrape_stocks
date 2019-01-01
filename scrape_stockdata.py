@@ -636,8 +636,8 @@ def check_market_status():
     # today_utc = pd.to_datetime('now').date()
     today_ny = datetime.datetime.now(pytz.timezone('America/New_York'))
     ndq = mcal.get_calendar('NASDAQ')
-    open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_ny)
-    if today_utc in open_days.index:
+    open_days = ndq.schedule(start_date=today_ny - pd.Timedelta('10 days'), end_date=today_ny)
+    if today_ny in open_days.index:
         return open_days
     else:
         return None
@@ -651,13 +651,14 @@ def daily_scrape_data():
     # TODO: check if was scraped last open date and if not and market is closed, scrape
     last_scrape = None
     while True:
-        today_utc = pd.to_datetime('now')
+        # today_utc = pd.to_datetime('now')
+        today_ny = datetime.datetime.now(pytz.timezone('America/New_York'))
         # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
-        if last_scrape != today_utc.date():
+        if last_scrape != today_ny.date():
             open_days = check_market_status()
             if open_days is not None:
-                if today_utc.hour > open_days.loc[today_utc.date()]['market_close'].hour:
-                    last_scrape = today_utc.date()
+                if today_ny.hour > open_days.loc[today_ny.date()]['market_close'].hour:
+                    last_scrape = today_ny.date()
                     print('scraping...')
                     scrape_all_tickers_mongo_parallel()
                 else:
