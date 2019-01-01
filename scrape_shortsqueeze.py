@@ -154,9 +154,20 @@ def setup_driver(backend='FF'):
         # download once, check 'don't ask again' and 'save'
         # also change downloads folder to ticker_data within git repo
         # then file path to profile, and use here:
-        prof_path = '/home/nate/.mozilla/firefox/4mmudyyu.short_squeeze' # short_squeeze was the name of the profile
+        # short_squeeze was the name of the profile
+        prof_paths = ['/home/nate/.mozilla/firefox/4mmudyyu.short_squeeze',
+                        '/home/nate/.mozilla/firefox/bnmsym9o.short_squeeze']
         # saves to downloads folder by default
-        profile = webdriver.FirefoxProfile(prof_path)
+        found_prof = False
+        for p in prof_paths:
+            if os.path.exists(p):
+                found_prof = True
+                profile = webdriver.FirefoxProfile(p)
+
+        if not found_prof:
+            print('couldn\'t find profile, going with default')
+            profile = webdirver.FirefoxProfile()
+
         # auto-download unknown mime types:
         # http://forums.mozillazine.org/viewtopic.php?f=38&t=2430485
         # set to text/csv and comma-separated any other file types
