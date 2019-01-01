@@ -6,6 +6,7 @@ import os
 import time
 import pytz
 import glob
+import shutil
 import calendar
 import datetime
 import traceback
@@ -131,7 +132,9 @@ def check_for_new_excel(driver):
         full_fn = '/home/nate/Downloads/' + f
         print(full_fn)
         if os.path.exists(full_fn):
-            os.rename(full_fn, HOME_DIR + 'short_squeeze.com/' + f)
+            # os.rename(full_fn, HOME_DIR + 'short_squeeze.com/' + f)
+            shutil.copy(full_fn, HOME_DIR + 'short_squeeze.com/' + f)
+            os.remove(full_fn)
 
 
 def setup_driver(backend='FF'):
@@ -264,7 +267,9 @@ def download_daily_data(driver=None, date=None):
     for f in filenames:
         og_file = '/home/nate/Downloads/' + f
         if os.path.exists(og_file):
-            os.rename(og_file, HOME_DIR + 'short_squeeze_daily/' + f)
+            # os.rename(og_file, HOME_DIR + 'short_squeeze_daily/' + f)
+            shutil.copy(og_file, HOME_DIR + 'short_squeeze.com/' + f)
+            os.remove(og_file)
 
 
 def check_market_status():
