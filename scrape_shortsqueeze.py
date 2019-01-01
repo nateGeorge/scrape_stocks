@@ -84,7 +84,13 @@ def check_for_new_excel(driver):
     checks for new excel files to download, and if they aren't in the data folder,
     downloads them
     """
-    driver.get('http://shortsqueeze.com/ShortFiles.php')
+    while True:
+        try:
+            driver.get('http://shortsqueeze.com/ShortFiles.php')
+            break
+        except TimeoutException:
+            pass
+
     years = get_years(driver)
     # get currently downloaded files
     dates_df = pd.read_excel(get_home_dir(repo_name='scrape_stocks') + 'short_squeeze_release_dates.xlsx', None)
@@ -268,7 +274,7 @@ def download_daily_data(driver=None, date=None):
         og_file = '/home/nate/Downloads/' + f
         if os.path.exists(og_file):
             # os.rename(og_file, HOME_DIR + 'short_squeeze_daily/' + f)
-            shutil.copy(og_file, HOME_DIR + 'short_squeeze.com/' + f)
+            shutil.copy(og_file, HOME_DIR + 'short_squeeze_daily/' + f)
             os.remove(og_file)
 
 
