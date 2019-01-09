@@ -32,16 +32,6 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
 
 
-try:
-    # fix: https://github.com/instabot-py/instabot.py/issues/1642#issuecomment-430186348
-    ua = UserAgent(verify_ssl=False, use_cache_server=False)
-    # ua = UserAgent()
-except:
-    print("Couldn't make user agent, trying again")
-    # ua = UserAgent()
-    ua = UserAgent(verify_ssl=False, use_cache_server=False)
-
-
 BASE_URL = 'http://www.nasdaq.com/'
 # DB = 'yahoo_test'
 DB = 'yahoo_stock_data'
@@ -835,3 +825,14 @@ def show_top_shorts(full_df):
     full_df[full_df['Forward P/E'] > 0].sort_values(by='Short Ratio', ascending=False)[['Short shares %', 'Short % of Float', 'Short Ratio', 'ticker', 'Forward P/E', 'Shares Short']]
     full_df[full_df['Diluted EPS'] > 0].sort_values(by='Days to cover', ascending=False)[['Diluted EPS', 'Short Ratio', 'Days to cover', 'Short % of Float', 'Short shares %', 'Forward P/E', 'Shares Short']]
     full_df[(full_df['Diluted EPS'] > 0) & (full_df['Short % of Float'] > 15)].sort_values(by='Days to cover', ascending=False)[['Diluted EPS', 'Short Ratio', 'Days to cover', 'Short % of Float', 'Short shares %', 'Forward P/E', 'Shares Short']][:50]
+
+
+if __name__ == '__main__':
+    try:
+        # fix: https://github.com/instabot-py/instabot.py/issues/1642#issuecomment-430186348
+        ua = UserAgent(verify_ssl=False, use_cache_server=False)
+        # ua = UserAgent()
+    except:
+        print("Couldn't make user agent, trying again")
+        # ua = UserAgent()
+        ua = UserAgent(verify_ssl=False, use_cache_server=False)
