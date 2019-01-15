@@ -629,7 +629,7 @@ def check_market_status(utc=False):
     if utc:
         today_utc = pd.to_datetime('now').date()
         open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_utc)
-        if today_utc.date() in open_days.index:
+        if today_utc in open_days.index:
             return open_days
         else:
             return None
