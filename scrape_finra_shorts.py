@@ -228,7 +228,7 @@ def daily_scrape_data():
         today_utc = pd.to_datetime('now')
         # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
         if last_scrape != today_utc.date():
-            open_days = ss.check_market_status()
+            open_days = ss.check_market_status(utc=True)
             if open_days is not None:
                 if today_utc.hour > open_days.loc[today_utc.date()]['market_close'].hour:
                     last_scrape = today_utc.date()

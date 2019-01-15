@@ -628,16 +628,20 @@ def scrape_a_ticker_mongo(base_yahoo_query_url, t, data_date):
         client.close()
 
 
-def check_market_status():
+def check_market_status(utc=False):
     """
     Checks to see if market is open today.
     Uses the pandas_market_calendars package as mcal
     """
     # today = datetime.datetime.now(pytz.timezone('America/New_York')).date()
     # today_utc = pd.to_datetime('now').date()
-    today_ny = datetime.datetime.now(pytz.timezone('America/New_York'))
     ndq = mcal.get_calendar('NASDAQ')
-    open_days = ndq.schedule(start_date=today_ny - pd.Timedelta('10 days'), end_date=today_ny)
+    if utc:
+        today_utc = pd.to_datetime('now').date()
+        open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_ny)
+    else:
+        today_ny = datetime.datetime.now(pytz.timezone('America/New_York'))
+        open_days = ndq.schedule(start_date=today_ny - pd.Timedelta('10 days'), end_date=today_ny)
     if today_ny.date() in open_days.index:
         return open_days
     else:
