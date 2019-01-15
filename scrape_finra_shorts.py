@@ -24,6 +24,7 @@ from utils import get_home_dir
 
 HOME_DIR = get_home_dir(repo_name='scrape_stocks')
 FOLDERS = ['ADF', 'NASDAQ', 'NYSE', 'ORF']
+FILEPATH = '/home/nate/Dropbox/data/finra/'
 
 
 def dl_and_get_df(ul, org):
@@ -31,18 +32,18 @@ def dl_and_get_df(ul, org):
     :param ul: html of ul with links
     :param org: the organization, one of ['ADF', 'NASDAQ', 'NYSE', 'ORF']
     """
-    if not os.path.exists('data'):
-        os.mkdir('data')
+    if not os.path.exists(FILEPATH):
+        os.mkdir(FILEPATH)
 
-    if not os.path.exists('data/' + org):
-        os.mkdir('data/' + org)
+    if not os.path.exists(FILEPATH + org):
+        os.mkdir(FILEPATH + org)
 
     dfs = []
     for l in ul.find_all('li'):
         link = l.find('a').attrs['href']
         filename = link.split('/')[-1]
-        urllib.request.urlretrieve(link, 'data/' + org + '/' + filename)
-        df = pd.read_csv('data/' + org + '/' + filename, sep='|')
+        urllib.request.urlretrieve(link, FILEPATH + org + '/' + filename)
+        df = pd.read_csv(FILEPATH + org + '/' + filename, sep='|')
         nona = df.dropna()
         if df.shape != nona.shape and df.shape[0] == 1:
             print('empty file!')
@@ -109,7 +110,7 @@ def get_idx(verbose=False):
 def get_current_files(fullpath=False):
     files = []
     for f in FOLDERS:
-        filenames = HOME_DIR + 'data/' + f + '/*.txt'
+        filenames = FILEPATH + f + '/*.txt'
         if fullpath:
             files.extend(glob.glob(filenames))
         else:
@@ -162,7 +163,7 @@ def update_data(check_all_months=True, verbose=False):
         print(f)
         link = fn_dict[f]
         org = get_org(f)
-        datadir = 'data/' + org + '/'
+        datadir = FILEPATH + org + '/'
         if not os.path.exists(datadir):
             os.mkdir(datadir)
         urllib.request.urlretrieve(link, datadir + f)
