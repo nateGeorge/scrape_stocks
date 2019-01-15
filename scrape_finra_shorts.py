@@ -23,7 +23,7 @@ import scrape_stockdata as ss
 from utils import get_home_dir
 
 HOME_DIR = get_home_dir(repo_name='scrape_stocks')
-FOLDERS = ['ADF', 'NASDAQ', 'NYSE', 'ORF']
+FOLDERS = ['ADF', 'NASDAQ', 'NYSE', 'ORF', 'NASDAQ-Chicago']
 FILEPATH = '/home/nate/Dropbox/data/finra/'
 
 
@@ -167,8 +167,6 @@ def update_data(check_all_months=True, verbose=False):
         if not os.path.exists(datadir):
             os.mkdir(datadir)
 
-        print('should be saving to:')
-        print(datadir +  f)
         urllib.request.urlretrieve(link, datadir + f)
 
 
