@@ -628,14 +628,18 @@ def check_market_status(utc=False):
     ndq = mcal.get_calendar('NASDAQ')
     if utc:
         today_utc = pd.to_datetime('now').date()
-        open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_ny)
+        open_days = ndq.schedule(start_date=today_utc - pd.Timedelta('10 days'), end_date=today_utc)
+        if today_utc.date() in open_days.index:
+            return open_days
+        else:
+            return None
     else:
         today_ny = datetime.datetime.now(pytz.timezone('America/New_York'))
         open_days = ndq.schedule(start_date=today_ny - pd.Timedelta('10 days'), end_date=today_ny)
-    if today_ny.date() in open_days.index:
-        return open_days
-    else:
-        return None
+        if today_ny.date() in open_days.index:
+            return open_days
+        else:
+            return None
 
 
 def daily_scrape_data():
