@@ -166,6 +166,9 @@ def update_data(check_all_months=True, verbose=False):
         datadir = FILEPATH + org + '/'
         if not os.path.exists(datadir):
             os.mkdir(datadir)
+
+        print('should be saving to:')
+        print(datadir +  f)
         urllib.request.urlretrieve(link, datadir + f)
 
 
