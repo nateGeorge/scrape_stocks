@@ -165,7 +165,10 @@ def setup_driver(backend='FF'):
         # then file path to profile, and use here:
         # short_squeeze was the name of the profile
         prof_paths = ['/home/nate/.mozilla/firefox/4mmudyyu.short_squeeze',
-                        '/home/nate/.mozilla/firefox/bnmsym9o.short_squeeze']
+                        '/home/nate/.mozilla/firefox/bnmsym9o.short_squeeze',
+                        # work ubuntu 18.04
+                        '/home/nate/.mozilla/firefox/9xcrqt7o.short_squeeze'
+                        ]
         # saves to downloads folder by default
         found_prof = False
         for p in prof_paths:
@@ -204,7 +207,7 @@ def setup_driver(backend='FF'):
           "download.directory_upgrade": True,
           "safebrowsing.enabled": True
         })
-        driver = webdriver.Chrome(chrome_options=options, executable_path='/home/nate/geckodriver')
+        driver = webdriver.Chrome(chrome_options=options)
 
     return driver
 
