@@ -198,7 +198,7 @@ def setup_driver(backend='FF'):
         # # profile.set_preference('browser.download.dir', '/tmp')
         # profile.set_preference('browser.helperApps.neverAsk.saveToDisk', 'text/csv')
         # profile.set_preference('browser.helperApps.neverAsk.saveToDisk', '*')
-        driver = webdriver.Firefox(profile, executable_path='/home/nate/geckodriver')
+        driver = webdriver.Firefox(profile)
     elif backend == 'CH':
         options = webdriver.ChromeOptions()
         options.add_experimental_option("prefs", {
