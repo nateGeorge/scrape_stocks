@@ -779,7 +779,7 @@ def write_backup_file():
 
 
 def restore_backup_file():
-    list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz') # * means all if need specific format then *.csv
+    list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz')
     latest_file = max(list_of_files, key=os.path.getctime)
     os.system('mongorestore --gzip --archive={} --db yahoo_stock_data'.format(latest_file))
 
