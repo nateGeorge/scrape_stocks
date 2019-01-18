@@ -770,19 +770,19 @@ def write_backup_file():
     os.system('mongodump --archive={} --gzip --db yahoo_stock_data'.format(filename))
     # if file was written, then delete older ones
     if os.path.exists(filename):
-    # list all files, and remove all but most recent
-    list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz') # * means all if need specific format then *.csv
-    latest_file = max(list_of_files, key=os.path.getctime)
-    for f in list_of_files:
-        if f != filename:
-            os.remove(f)
+        # list all files, and remove all but most recent
+        list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz') # * means all if need specific format then *.csv
+        latest_file = max(list_of_files, key=os.path.getctime)
+        for f in list_of_files:
+            if f != filename:
+                os.remove(f)
 
 
 def restore_backup_file():
     list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz') # * means all if need specific format then *.csv
     latest_file = max(list_of_files, key=os.path.getctime)
     os.system('mongorestore --gzip --archive={} --db yahoo_stock_data'.format(latest_file))
-    
+
 
 def restore_backup():
     # need to run mongo and do:
