@@ -27,7 +27,6 @@ import odo
 import pytz
 from tqdm import tqdm
 import pandas_market_calendars as mcal
-from pymongo import MongoClient
 from concurrent.futures.thread import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
 
@@ -567,6 +566,7 @@ def scrape_all_tickers_mongo_parallel(tickers=None):
     #
     #         for th in threads:
     #             th.join()
+    write_backup()
 
 
 def scrape_a_ticker_mongo(base_yahoo_query_url, t, data_date):
@@ -759,6 +759,30 @@ def backup_db():
                          todb='yahoo_stock_data_bkup')
     client.close()
 
+
+def write_backup_file():
+    """
+    uses mongodump to write backup file
+    """
+    tz = pytz.timezone('US/Eastern')
+    todays_date_eastern = datetime.datetime.now(tz).strftime('%m-%d-%Y')
+    filename = '/home/nate/Dropbox/data/mongodb/yahoo_stock_data/yahoo_stock_data.{}.gz'.format(todays_date_eastern)
+    os.system('mongodump --archive={} --gzip --db yahoo_stock_data'.format(filename))
+    # if file was written, then delete older ones
+    if os.path.exists(filename):
+    # list all files, and remove all but most recent
+    list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz') # * means all if need specific format then *.csv
+    latest_file = max(list_of_files, key=os.path.getctime)
+    for f in list_of_files:
+        if f != filename:
+            os.remove(f)
+
+
+def restore_backup_file():
+    list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz') # * means all if need specific format then *.csv
+    latest_file = max(list_of_files, key=os.path.getctime)
+    os.system('mongorestore --gzip --archive={} --db yahoo_stock_data'.format(latest_file))
+    
 
 def restore_backup():
     # need to run mongo and do:
