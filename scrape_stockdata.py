@@ -566,7 +566,7 @@ def scrape_all_tickers_mongo_parallel(tickers=None):
     #
     #         for th in threads:
     #             th.join()
-    write_backup()
+    write_backup_file()
 
 
 def scrape_a_ticker_mongo(base_yahoo_query_url, t, data_date):
