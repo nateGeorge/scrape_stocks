@@ -660,6 +660,7 @@ def daily_scrape_data():
                     last_scrape = today_ny.date()
                     print('scraping...')
                     scrape_all_tickers_mongo_parallel()
+                    write_backup_file()
                 else:
                     # need to make it wait number of hours until close
                     print('waiting for market to close, waiting 1 hour...')
@@ -771,7 +772,7 @@ def write_backup_file():
     # if file was written, then delete older ones
     if os.path.exists(filename):
         # list all files, and remove all but most recent
-        list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz') # * means all if need specific format then *.csv
+        list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz')
         latest_file = max(list_of_files, key=os.path.getctime)
         for f in list_of_files:
             if f != filename:
