@@ -377,6 +377,10 @@ def download_updates():
         except:
             traceback.print_exc()
             time.sleep(5)
+            try:
+                driver.quit()
+            except:
+                pass
 
 
 if __name__ == "__main__":
