@@ -71,6 +71,11 @@ def parse_bimo_dates(filename, dates_df, rev_cal_dict):
     month_num = int(date[-3:-1])
     month = rev_cal_dict[month_num]
     ab = date[-1].upper()
+    if year not in dates_df:
+        # TODO: auto-update with selenium scraper
+        print('year', year, 'is not in dates_df -- need to update release dates excel file')
+        return None
+
     t_df = dates_df[year]
     date = '-'.join([year,
                     str(month_num).zfill(2),
@@ -101,6 +106,12 @@ def check_for_new_excel(driver):
     bimonthly_files = glob.glob(HOME_DIR + 'short_squeeze.com/*.xlsx')
     bimonthly_filenames = set([f.split('/')[-1] for f in bimonthly_files])
     bimo_dates = [parse_bimo_dates(f, dates_df, rev_cal_dict) for f in bimonthly_files]
+    # if any dates none, it's because that year isn't in excel file of release dates yet
+    all_none = [d is None for d in bimo_dates]
+    if any(all_none):
+        print('latest release date info not in excel file; need to update it')
+        return
+        
     latest_date = max(bimo_dates).date()
     latest_year = latest_date.year
     check_years = years[years >= latest_year]
@@ -380,7 +391,7 @@ def download_updates():
             try:
                 driver.quit()
             except:
-                pass
+                print('couldn\'t quit driver')
 
 
 if __name__ == "__main__":

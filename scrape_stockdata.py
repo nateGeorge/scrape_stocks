@@ -802,12 +802,15 @@ def clean_dupes():
 
     client = MongoClient()
     db = client[DB]
+    coll = db['data']
     pipeline = [
         {'$group': { '_id': {'ticker': '$ticker', 'date': '$date'}, 'doc' : {'$first': '$$ROOT'}}},
         {'$replaceRoot': { 'newRoot': '$doc'}},
         {'$out': 'data'}
     ]
-    db.command('aggregate', 'data', pipeline=pipeline, allowDiskUse=True)
+    coll.appgregate(pipeline, allowDiskUse=True)
+    # deprecated
+    # db.command('aggregate', 'data', pipeline=pipeline, allowDiskUse=True)
     client.close()
 
     # works in mongo
