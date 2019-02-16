@@ -23,7 +23,7 @@ from lxml import html
 import pandas as pd
 import numpy as np
 from pymongo import MongoClient
-import odo
+# import odo
 import pytz
 from tqdm import tqdm
 import pandas_market_calendars as mcal
@@ -715,6 +715,9 @@ def scrape_all_tickers_mongo_old(tickers):
     client = MongoClient()
     db = client[DB]
     coll = db['yahoo_stock_stats']
+    print('CANT USE ODO ANYMORE, UNMAINTANED -- fix up')
+    client.close()
+    return
     odo.odo(full_df, coll)
     client.close()
 
