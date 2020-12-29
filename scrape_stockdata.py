@@ -15,6 +15,7 @@ from bson import json_util
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from fake_useragent import UserAgent
+import fake_useragent
 import requests as req
 from requests.exceptions import Timeout, SSLError
 from OpenSSL.SSL import WantReadError
@@ -770,7 +771,8 @@ def write_backup_file():
     """
     tz = pytz.timezone('US/Eastern')
     todays_date_eastern = datetime.datetime.now(tz).strftime('%m-%d-%Y')
-    filename = '/home/nate/Dropbox/data/mongodb/yahoo_stock_data/yahoo_stock_data.{}.gz'.format(todays_date_eastern)
+    # filename = '/home/nate/Dropbox/data/mongodb/yahoo_stock_data/yahoo_stock_data.{}.gz'.format(todays_date_eastern)
+    filename = '/media/nate/bigdata1/onedrive/data/mongodb/yahoo_stock_data/yahoo_stock_data.{}.gz'.format(todays_date_eastern)
     os.system('mongodump --archive={} --gzip --db yahoo_stock_data'.format(filename))
     # if file was written, then delete older ones
     if os.path.exists(filename):
@@ -783,7 +785,8 @@ def write_backup_file():
 
 
 def restore_backup_file():
-    list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz')
+    # list_of_files = glob.glob('/home/nate/Dropbox/data/mongodb/yahoo_stock_data/*.gz')
+    list_of_files = glob.glob('/media/nate/bigdata1/onedrive/data/mongodb/yahoo_stock_data/*.gz')
     latest_file = max(list_of_files, key=os.path.getctime)
     os.system('mongorestore --gzip --archive={} --db yahoo_stock_data'.format(latest_file))
 
@@ -867,11 +870,15 @@ def show_top_shorts(full_df):
 
 
 if __name__ == '__main__':
-    try:
-        # fix: https://github.com/instabot-py/instabot.py/issues/1642#issuecomment-430186348
-        ua = UserAgent(verify_ssl=False, use_cache_server=False)
-        # ua = UserAgent()
-    except:
-        print("Couldn't make user agent, trying again")
-        # ua = UserAgent()
-        ua = UserAgent(verify_ssl=False, use_cache_server=False)
+    tries = 0
+    while True:
+        tries += 1
+        if tries == 10:
+            break
+        try:
+            # fix: https://github.com/instabot-py/instabot.py/issues/1642#issuecomment-430186348
+            location = '/home/nate/fake_useragent%s.json' % fake_useragent.VERSION
+            ua = UserAgent(verify_ssl=False, use_cache_server=False, path=location)
+            # ua = UserAgent()
+        except:
+            print("Couldn't make user agent, trying again")

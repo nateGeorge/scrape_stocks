@@ -15,6 +15,7 @@ from bson import json_util
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from fake_useragent import UserAgent
+import fake_useragent
 import requests as req
 from requests.exceptions import Timeout, SSLError
 from OpenSSL.SSL import WantReadError
@@ -32,11 +33,17 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
 
 
-try:
-    ua = UserAgent()
-except:
-    print("Couldn't make user agent, trying again")
-    ua = UserAgent()
+tries = 0
+while True:
+    tries += 1
+    if tries == 10:
+        break
+    try:
+        # normally stored in /tmp
+        location = '/home/nate/fake_useragent%s.json' % fake_useragent.VERSION
+        ua = UserAgent(verify_ssl=False, use_cache_server=False, path=location)
+    except:
+        print("Couldn't make user agent, trying again")
 
 BASE_URL = 'https://www.zacks.com/stock/research/{}/earnings-announcements'
 DB = 'zacks_data'

@@ -18,6 +18,7 @@ from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from fake_useragent import UserAgent
+import fake_useragent
 import numpy as np
 import pandas as pd
 import pandas_market_calendars as mcal
@@ -26,11 +27,17 @@ import pandas_market_calendars as mcal
 import scrape_stockdata as ss
 from utils import get_home_dir
 
-try:
-    ua = UserAgent()
-except:
-    print("Couldn't make user agent, trying again")
-    ua = UserAgent()
+tries = 0
+while True:
+    tries += 1
+    if tries == 10:
+        break
+    try:
+        # normally stored in /tmp
+        location = '/home/nate/fake_useragent%s.json' % fake_useragent.VERSION
+        ua = UserAgent(verify_ssl=False, use_cache_server=False, path=location)
+    except:
+        print("Couldn't make user agent, trying again")
 
 base_url = 'http://shortsqueeze.com/{}.php'
 login_url = 'http://shortsqueeze.com/signin.php'
@@ -40,7 +47,8 @@ YEARS = ['2015', '2016', '2017']
 UNAME = os.environ.get('ss_uname')
 PWORD = os.environ.get('ss_pass')
 # HOME_DIR = get_home_dir(repo_name='scrape_stocks')
-HOME_DIR = '/home/nate/Dropbox/data/shortsqueeze/'
+# HOME_DIR = '/home/nate/Dropbox/data/shortsqueeze/'
+HOME_DIR = '/media/nate/bigdata1/onedrive/data/shortsqueeze/'
 
 
 def get_years(driver):
@@ -111,7 +119,7 @@ def check_for_new_excel(driver):
     if any(all_none):
         print('latest release date info not in excel file; need to update it')
         return
-        
+
     latest_date = max(bimo_dates).date()
     latest_year = latest_date.year
     check_years = years[years >= latest_year]
